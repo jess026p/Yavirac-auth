@@ -1,0 +1,55 @@
+<ion-content [fullscreen]="true">
+  <div class="content-wrapper">
+    <ion-card class="custom-card">
+      <ion-card-header>
+        <ion-card-title>Registro</ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <form>
+          <!-- Cédula -->
+          <ion-item>
+            <ion-icon slot="start" name="id-card-outline"></ion-icon>
+            <ion-label position="floating">Cédula</ion-label>
+            <ion-input type="text" required></ion-input>
+          </ion-item>
+
+          <!-- Nombre -->
+          <ion-item>
+            <ion-icon slot="start" name="person-outline"></ion-icon>
+            <ion-label position="floating">Nombre</ion-label>
+            <ion-input type="text" required></ion-input>
+          </ion-item>
+
+          <!-- Apellido -->
+          <ion-item>
+            <ion-icon slot="start" name="people-outline"></ion-icon>
+            <ion-label position="floating">Apellido</ion-label>
+            <ion-input type="text" required></ion-input>
+          </ion-item>
+
+          <!-- Correo Electrónico -->
+          <ion-item>
+            <ion-icon slot="start" name="mail-outline"></ion-icon>
+            <ion-label position="floating">Correo Electrónico</ion-label>
+            <ion-input type="email" required></ion-input>
+          </ion-item>
+
+          <!-- Huella Digital -->
+          <!-- Botón para la autenticación con huella digital -->
+
+
+          <ion-button class="fingerprint-btn" expand="block" (click)="autenticarConHuella()">
+            <ion-icon slot="start" name="finger-print-outline"></ion-icon>
+            Autenticar con Huella
+          </ion-button>
+
+
+
+          <!-- Botón de registro -->
+          <ion-button expand="block" class="register-btn">Registrarse</ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

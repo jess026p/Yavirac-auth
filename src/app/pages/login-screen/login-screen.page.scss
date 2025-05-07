@@ -1,0 +1,73 @@
+ion-content {
+  --background: linear-gradient(135deg, #FF8000, #0055FF); /* Degradado de naranja a azul */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Contenedor principal para centrar el ion-card */
+.content-wrapper {
+  display: flex;
+  justify-content: center; /* Centrar horizontalmente */
+  align-items: center; /* Centrar verticalmente */
+  width: 100%;
+  height: 100vh; /* Ocupar toda la pantalla */
+  padding: 20px; /* Espacio alrededor del contenido */
+  box-sizing: border-box; /* Evita que el padding afecte el tamaño */
+}
+
+/* Estilos del ion-card con fondo difuminado */
+.custom-card {
+  position: relative; /* Permite que los hijos se posicionen con respecto a él */
+  background: rgba(255, 255, 255, 0.2); /* Fondo translúcido más claro */
+  border-radius: 25px;
+  box-shadow: 0 4px 20px rgba(251, 241, 241, 0.3),
+  0 4px 40px rgba(25, 23, 23, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: 40px 20px;
+  text-align: center;
+  width: 90%;
+  max-width: 490px;
+  margin: 20px auto;
+}
+
+/* Sección que mantiene el fondo difuminado pero el contenido nítido */
+.custom-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(15px); /* Aplica desenfoque solo al fondo */
+  z-index: -1; /* Mantiene el filtro detrás del contenido */
+  border-radius: inherit;
+}
+
+
+/* Título */
+ion-card-title {
+  margin-top: 0px; /* Elimina espacio extra */
+  font-size: 10vw; /* Ajuste dinámico para móviles */
+  max-width: 100%; /* Asegura que use todo el ancho disponible */
+  color: #080808;
+  font-weight: 700;
+  white-space: nowrap; /* Evita saltos de línea */
+  display: flex;
+  justify-content: center; /* Centra el texto horizontalmente */
+  align-items: center; /* Asegura alineación vertical */
+  text-align: center;
+}
+
+/* Ícono de huella más definido */
+.lock ion-icon {
+  font-size: 6rem;
+  color: #1a65eb;
+  margin-top: 20px;
+}
+
+/* Texto con mejor legibilidad */
+.text-tag {
+  margin-top: 20px;
+  font-size: 20px;
+  color: #ffffff;
+  font-weight: 500;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); /* Agrega sombra para mayor contraste */
+}

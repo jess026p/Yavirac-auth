@@ -1,0 +1,160 @@
+/* 🔹 Imagen de fondo cubriendo toda la pantalla */
+.background-image {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1; /* Envía al fondo */
+  background-size: cover;
+  background-position: center;
+}
+
+/* 🔹 Estilos para el ion-content */
+ion-content {
+  --background: linear-gradient(135deg, #FF8000, #0055FF); /* Degradado de naranja a azul */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 100vh; /* Asegura que el contenido esté centrado verticalmente */
+  padding: 20px;
+}
+
+/* 🔹 Centrar y ajustar el logo */
+.logo {
+  width: 65vw; /* Ajuste dinámico según el ancho de la pantalla */
+  max-width: 320px; /* Tamaño máximo más grande */
+  display: block;
+  margin: 0 auto 5px auto; /* Reduce la separación entre el logo y el título */
+}
+
+/* 🔹 Tarjeta con fondo semitransparente */
+ion-card {
+
+    position: relative; /* Permite que los hijos se posicionen con respecto a él */
+    background: rgba(255, 255, 255, 0.2); /* Fondo translúcido más claro */
+    border-radius: 25px;
+    box-shadow: 0 4px 20px rgba(251, 241, 241, 0.3),
+    0 4px 40px rgba(25, 23, 23, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    padding: 40px 20px;
+    text-align: center;
+    width: 90%;
+    max-width: 350px;
+    margin: 20px auto;
+
+}
+
+/* 🔹 Estilos para el texto dentro de ion-card */
+ion-card-title {
+  margin-top: 0px; /* Elimina el margen excesivo con el logo */
+  font-size: 7vw; /* Aumentado para mejor visibilidad en móviles */
+  max-size: 50px;
+  color: #080808;
+  font-weight: 700;
+}
+
+ion-card-subtitle {
+  margin-top: 2px;
+  font-size: 5vw; /* Aumentado para mejorar lectura en pantallas pequeñas */
+  max-size: 24px;
+  color: #4a4949;
+  font-weight: 400;
+  text-transform: none !important;
+}
+
+/* 🔹 Botones */
+.signin-btns {
+  margin-top: 2vh;
+  text-align: center;
+}
+
+.loginbtn {
+  --ion-color-primary: #0258ff;
+}
+.Registrobtn{
+  --ion-color-primary: rgb(250, 157, 65);
+}
+ion-button {
+  width: 80%; /* Ocupa todo el ancho del contenedor */
+  max-width: 400px; /* Asegura que no se haga demasiado grande en pantallas grandes */
+  height: 40px; /* Aumenta la altura */
+  font-size: 16px; /* Ajusta el tamaño del texto */
+  font-weight: bold;
+  --border-radius: 20px; /* Hace que los bordes sean más redondeados */
+}
+
+
+
+
+/* 🔹 Ajustar el ion-header */
+ion-header {
+  position: absolute;
+  width: 100%;
+}
+
+ion-toolbar {
+  --ion-background-color: transparent;
+  --opacity: 0;
+}
+
+/* 🔹 Para centrar los iconos sociales */
+.Iconos {
+  margin-top: 2vh;
+  display: flex;
+  justify-content: center;
+  gap: 2vw;
+}
+
+/* 🔹 Ajustes de texto */
+.text-tag {
+  margin-top: 2vh;
+  text-align: center;
+}
+
+.text-tag span {
+  font-size: 6vw; /* Aumentado para mayor visibilidad */
+  max-size: 24px;
+  font-weight: normal;
+  color: #424040;
+}
+ion-card-header {
+  margin-top: -10px; /* Ajusta este valor según lo necesites */
+  padding-top: 0; /* Elimina cualquier relleno superior adicional */
+}
+ion-card-title {
+  margin-bottom: 10px; /* Espacio entre el título y el subtítulo */
+}
+
+ion-card-subtitle {
+  margin-top: 15px !important; /* Ajusta este valor para más separación */
+}
+
+/* 🔹 Responsividad */
+@media (max-width: 768px) {
+  .logo {
+    width: 95vw;
+    max-width: 310px;
+  }
+
+  ion-card {
+    width: 95%;
+    padding: 40px 6vw;
+    margin: 15vh auto; /* Agrega margen superior en pantallas pequeñas */
+  }
+
+  ion-card-title {
+    font-size: 11vw;
+    margin-bottom: 15px; /* Aumenta el espacio entre el título y el subtítulo en pantallas pequeñas */
+  }
+
+  ion-card-subtitle {
+    font-size: 6vw;
+    margin-top: 15px !important; /* Asegura que el subtítulo se separe del título */
+  }
+
+  .text-tag span {
+    font-size: 7vw;
+  }
+}

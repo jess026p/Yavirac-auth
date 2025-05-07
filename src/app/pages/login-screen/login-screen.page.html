@@ -1,0 +1,27 @@
+<ion-content [fullscreen]="true">
+  <div class="content-wrapper">
+    <ion-card class="custom-card">
+      <ion-img src="assets/imagenes/logo_loginYavirac.png" class="logo"></ion-img>
+
+      <ion-card-header>
+        <ion-card-title>
+          Iniciar sesión
+        </ion-card-title>
+      </ion-card-header>
+
+      <ion-card-content>
+        <div class="ion-text-center ion-margin-vertical lock">
+          <ion-icon name="finger-print"></ion-icon>
+        </div>
+
+        <div class="ion-margin">
+          <ion-button expand="block" (click)="loginWithFingerprint()" size="large">Autenticarse</ion-button>
+        </div>
+
+        <div class="text-tag">
+          <span>Requiere de Huella Dactilar</span>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

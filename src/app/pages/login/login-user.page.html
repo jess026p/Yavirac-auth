@@ -1,0 +1,37 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar></ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-card class="ion-no-margin">
+    <ion-img class="logo" src="assets/imagenes/logo_loginYavirac.png"></ion-img>
+    <ion-card-header>
+      <ion-card-title style="text-align: center;">
+        Iniciar Sesión
+      </ion-card-title>
+      <ion-card-subtitle class="ion-text-lowercase" style="text-align: center;">
+        ingresa tus credenciales para acceder
+      </ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <form (ngSubmit)="login()">
+        <ion-item>
+          <ion-label position="floating">Usuario</ion-label>
+          <ion-input type="text" [(ngModel)]="username" name="username" required></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-label position="floating">Contraseña</ion-label>
+          <ion-input type="password" [(ngModel)]="password" name="password" required></ion-input>
+        </ion-item>
+        <div class="signin-btns" style="display: flex; flex-direction: column; gap: 18px; margin-top: 32px; align-items: center;">
+          <ion-button expand="block" size="large" fill="solid" shape="round" class="loginbtn" type="submit" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
+            INICIAR SESIÓN
+          </ion-button>
+          <ion-button expand="block" size="large" fill="outline" shape="round" class="loginbtn" routerLink="/login-screen" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
+            INICIAR POR HUELLA
+          </ion-button>
+        </div>
+      </form>
+    </ion-card-content>
+  </ion-card>
+</ion-content> 

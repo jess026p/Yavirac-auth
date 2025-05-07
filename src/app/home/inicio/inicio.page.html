@@ -1,0 +1,53 @@
+<ion-content>
+
+  <!-- 🔹 Tarjeta de Horarios -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Horario del Día</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p>
+        📅 Hoy es: <strong>{{ getHorarioDelDia().dia }}</strong> <br />
+        ⏰ Horario: <strong>{{ getHorarioDelDia().hora }}</strong>
+      </p>
+      <ion-button expand="full" (click)="alternarHorarios()">
+        {{ mostrarTodosHorarios ? 'Ocultar' : 'Mostrar' }} todos los horarios
+      </ion-button>
+
+      <ion-list *ngIf="mostrarTodosHorarios">
+        <ion-item *ngFor="let horario of horarios">
+          <ion-label>
+            📅 <strong>{{ horario.dia }}</strong>: {{ horario.hora }}
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- 🔹 Tarjeta de Mapa (Se carga después de los horarios) -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Mapa de Ubicación</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div id="map" style="height: 300px;"></div> <!-- Contenedor del mapa -->
+    </ion-card-content>
+  </ion-card>
+
+  <!-- 🔹 Tarjeta con la Ubicación del Usuario -->
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Tu Ubicación</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <p *ngIf="userLocation">
+        📍 Latitud: {{ userLocation.lat }} <br />
+        📍 Longitud: {{ userLocation.lng }}
+      </p>
+      <p *ngIf="!userLocation">⏳ Obteniendo ubicación...</p>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-button expand="full" (click)="checkAttendance()">Verificar Asistencia</ion-button>
+
+</ion-content>

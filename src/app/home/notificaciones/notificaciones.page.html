@@ -1,0 +1,16 @@
+<ion-content>
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Notificaciones</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list>
+        <ion-item *ngFor="let notificacion of notificaciones">
+          <ion-label>
+            <p>{{ notificacion.fecha }} - {{ notificacion.mensaje }}</p>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

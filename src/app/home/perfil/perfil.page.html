@@ -1,0 +1,17 @@
+<ion-content>
+  <ion-card>
+    <ion-card-header>
+      <ion-card-title>Perfil</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="profile-container">
+        <img [src]="userProfileImage" class="profile-image"/>
+        <h2>{{ userName }}</h2>
+        <p>📧 {{ userEmail }}</p>
+        <p>📍 Ubicación registrada: {{ userLocation }}</p>
+        <p>🔒 Autenticación biométrica: {{ biometricAuth ? 'Activada' : 'Desactivada' }}</p>
+      </div>
+      <ion-button expand="full" (click)="editarPerfil()">Editar Perfil</ion-button>
+    </ion-card-content>
+  </ion-card>
+</ion-content>
