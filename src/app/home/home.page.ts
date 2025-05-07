@@ -5,7 +5,7 @@ import { homeOutline, personOutline, notificationsOutline, settingsOutline, pers
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-
+import { addIcons } from 'ionicons';
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -23,7 +23,8 @@ export class HomePage {
 
   user$ = this.authService.user$;
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(private authService: AuthService, private router: Router) {
+      addIcons({personCircleOutline,logOutOutline});}
 
   logout() {
     this.authService.logout();

@@ -10,7 +10,9 @@
             <ion-icon name="person-circle-outline" style="font-size: 2.5em; color: #fff;"></ion-icon>
           </ng-template>
         </ion-avatar>
-        <span style="font-weight: bold; font-size: 1.1em; color: #fff;">{{ (user$ | async)?.name || 'Nombre' }}</span>
+        <span style="font-weight: bold; font-size: 1.1em; color: #fff;">
+          {{ (user$ | async)?.name }} {{ (user$ | async)?.lastname }}
+        </span>
       </div>
       <ion-button fill="clear" (click)="logout()" style="margin-left: 8px; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center;">
         <ion-icon slot="icon-only" name="log-out-outline" style="color: #fff;"></ion-icon>
