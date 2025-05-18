@@ -7,9 +7,9 @@
     </ion-card-header>
     <ion-card-content>
       <p>
-        📅 Hoy es: <strong>{{ getHorarioDelDia().dia }}</strong> <br />
-        ⏰ Horario: <strong>{{ getHorarioDelDia().hora }}</strong> <br />
-        🗓️ Vigencia: <strong>{{ getHorarioDelDia().fechaInicio }} - {{ getHorarioDelDia().fechaFin }}</strong>
+         Hoy es: <strong>{{ horarioHoy ? diasToNombres(horarioHoy.dias) : 'Sin horario asignado hoy' }}</strong> <br />
+        ⏰ Horario: <strong>{{ horarioHoy ? (horarioHoy.horaInicio.slice(0,5) + ' - ' + horarioHoy.horaFin.slice(0,5)) : '--:--' }}</strong> <br />
+        🗓️ Vigencia: <strong>{{ horarioHoy ? (horarioHoy.fechaInicio + ' - ' + horarioHoy.fechaFin) : '-' }}</strong>
       </p>
       <ion-button expand="full" (click)="alternarHorarios()">
         {{ mostrarTodosHorarios ? 'Ocultar' : 'Mostrar' }} todos los horarios
@@ -35,8 +35,12 @@
       <ion-card-title>Mapa de Ubicación</ion-card-title>
     </ion-card-header>
     <ion-card-content style="position: relative;">
+      <div *ngIf="!mapInitialized" class="map-loader">
+        <ion-spinner name="crescent"></ion-spinner>
+        <p>Cargando mapa...</p>
+      </div>
       <div id="map" style="height: 300px;"></div> <!-- Contenedor del mapa -->
-      <div *ngIf="!horarioHoy" class="map-overlay">
+      <div *ngIf="!horarioHoy && mapInitialized" class="map-overlay">
         <div class="overlay-content">
           <ion-icon name="lock-closed-outline" style="font-size: 2em;"></ion-icon>
           <p>Sin horario asignado hoy</p>
@@ -58,6 +62,6 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-button expand="full" (click)="checkAttendance()">Verificar Asistencia</ion-button>
+  <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()">Verificar Asistencia</ion-button>
 
 </ion-content>

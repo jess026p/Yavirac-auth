@@ -12,38 +12,46 @@
 
 /* 🔹 Estilos para el ion-content */
 ion-content {
-  --background: linear-gradient(135deg, #FF8000, #0055FF); /* Degradado de naranja a azul */
+  --background: linear-gradient(135deg, #FF8000, #0055FF);
+  min-height: 100vh;
+  height: 100vh;
   display: flex;
-  justify-content: center;
   align-items: center;
-  flex-direction: column;
-  height: 100vh; /* Asegura que el contenido esté centrado verticalmente */
-  padding: 20px;
+  justify-content: center;
+  padding: 0;
+}
+
+.login-center {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 🔹 Centrar y ajustar el logo */
 .logo {
-  width: 65vw; /* Ajuste dinámico según el ancho de la pantalla */
-  max-width: 320px; /* Tamaño máximo más grande */
   display: block;
-  margin: 0 auto 5px auto; /* Reduce la separación entre el logo y el título */
+  margin: 0 auto 12px auto;
+  width: 90%;
+  max-width: 240px;
 }
 
 /* 🔹 Tarjeta con fondo semitransparente */
 ion-card {
-
-    position: relative; /* Permite que los hijos se posicionen con respecto a él */
-    background: rgba(255, 255, 255, 0.2); /* Fondo translúcido más claro */
-    border-radius: 25px;
-    box-shadow: 0 4px 20px rgba(251, 241, 241, 0.3),
-    0 4px 40px rgba(25, 23, 23, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    padding: 40px 20px;
-    text-align: center;
-    width: 90%;
-    max-width: 350px;
-    margin: 20px auto;
-
+  position: relative; /* Permite que los hijos se posicionen con respecto a él */
+  background: rgba(255, 255, 255, 0.2); /* Fondo translúcido más claro */
+  border-radius: 25px;
+  box-shadow: 0 4px 20px rgba(251, 241, 241, 0.3),
+  0 4px 40px rgba(25, 23, 23, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: 40px 20px;
+  text-align: center;
+  width: 90%;
+  max-width: 450px;
+  margin: 20px auto;
+  min-height: unset;
+  max-height: unset;
+  display: block;
 }
 
 /* 🔹 Estilos para el texto dentro de ion-card */
@@ -76,7 +84,7 @@ ion-card-subtitle {
 .Registrobtn{
   --ion-color-primary: rgb(250, 157, 65);
 }
-ion-button {
+.ion-button {
   width: 80%; /* Ocupa todo el ancho del contenedor */
   max-width: 400px; /* Asegura que no se haga demasiado grande en pantallas grandes */
   height: 40px; /* Aumenta la altura */
@@ -156,5 +164,18 @@ ion-card-subtitle {
 
   .text-tag span {
     font-size: 7vw;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo {
+    width: 85%;
+    max-width: 180px;
+    margin-bottom: 10px;
+  }
+
+  ion-card {
+    min-height: 50vh;
+    max-height: 90vh;
   }
 }

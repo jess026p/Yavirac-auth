@@ -3,25 +3,27 @@
 </ion-header>
 
 <ion-content>
-  <ion-card class="ion-no-margin">
-    <ion-img class="logo" src="assets/imagenes/logo_loginYavirac.png"></ion-img>
-    <ion-card-header>
-      <ion-card-title>
-        Bienvenidos
-      </ion-card-title>
-      <ion-card-subtitle class="ion-text-lowercase">
-        Esta aplicación es una plataforma de registro
-      </ion-card-subtitle>
-    </ion-card-header>
-    <ion-card-content>
-      <div class="signin-btns" style="display: flex; flex-direction: column; gap: 18px; margin-top: 32px; align-items: center;">
-        <ion-button expand="block" size="large" fill="solid" shape="round" class="loginbtn" routerLink="/login-screen" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
-          INICIAR SESIÓN POR HUELLA
-        </ion-button>
-        <ion-button expand="block" size="large" fill="outline" shape="round" class="loginbtn" routerLink="/login-user" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px; color: #fff;">
-          INICIAR SESIÓN CON DATOS
-        </ion-button>
-      </div>
-    </ion-card-content>
-  </ion-card>
+  <div class="login-center">
+    <ion-card class="ion-no-margin">
+      <ion-img class="logo" src="assets/imagenes/logo_loginYavirac.png"></ion-img>
+      <ion-card-header>
+        <ion-card-title>
+          Bienvenidos
+        </ion-card-title>
+        <ion-card-subtitle class="ion-text-lowercase">
+          Esta aplicación es una plataforma de registro
+        </ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="signin-btns" style="display: flex; flex-direction: column; gap: 18px; margin-top: 32px; align-items: center;">
+          <ion-button expand="block" size="large" fill="solid" shape="round" class="loginbtn" routerLink="/login-screen" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
+            INICIAR SESIÓN POR HUELLA
+          </ion-button>
+          <ion-button expand="block" size="large" fill="outline" shape="round" class="loginbtn" routerLink="/login-user" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px; color: #fff;">
+            INICIAR SESIÓN CON DATOS
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
 </ion-content>

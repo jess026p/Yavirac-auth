@@ -46,7 +46,7 @@ export class LoginUserPage {
       ).toPromise();
       this.loading = false;
       this.showWelcomeToast(user?.name || this.username);
-      this.router.navigate(['/home']);
+      window.location.href = '/home/inicio';
     } catch (error) {
       this.loading = false;
       let message = 'Usuario o contraseña incorrectos';

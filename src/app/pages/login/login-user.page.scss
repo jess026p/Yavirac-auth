@@ -12,10 +12,10 @@ ion-content {
 }
 
 .logo {
-  width: 65vw;
-  max-width: 320px;
   display: block;
-  margin: 0 auto 5px auto;
+  margin: 0 auto 12px auto;
+  width: 100%;
+  max-width: 200px;
 }
 
 ion-card {
@@ -80,12 +80,12 @@ ion-toolbar {
 @media (max-width: 768px) {
   .logo {
     width: 95vw;
-    max-width: 310px;
+    max-width: 3100px;
   }
   ion-card {
     width: 95%;
     padding: 40px 6vw;
-    margin: 15vh auto;
+    margin: 15vh aut;
   }
   ion-card-title {
     font-size: 11vw;
@@ -94,6 +94,14 @@ ion-toolbar {
   ion-card-subtitle {
     font-size: 6vw;
     margin-top: 15px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo {
+    width: 85%;
+    max-width: 150px;
+    margin-bottom: 10px;
   }
 }
 
