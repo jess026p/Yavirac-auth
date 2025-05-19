@@ -17,6 +17,8 @@ import Circle from 'ol/geom/Circle';
 import { HorarioService } from '../../services/horario.service';
 import { AuthService } from '../../services/auth.service';
 import { take } from 'rxjs/operators';
+import { AsistenciaService } from '../../services/asistencia.service';
+
 
 @Component({
   selector: 'app-inicio',
@@ -44,7 +46,11 @@ export class InicioPage implements AfterViewInit {
 
   public mapInitialized = false;
 
-  constructor(private horarioService: HorarioService, private authService: AuthService) {}
+constructor(
+  private horarioService: HorarioService,
+  private authService: AuthService,
+  private asistenciaService: AsistenciaService // ✅ agregado correctamente
+) {}
 
   async ngAfterViewInit() {
     // Reset de variables clave
@@ -106,77 +112,92 @@ export class InicioPage implements AfterViewInit {
 
   setHorarioHoyYUbicacion() {
     // Obtener el día actual en formato 1-7 (lunes=1, ..., domingo=7)
-    const hoyJS = new Date().getDay();
-    const hoy = hoyJS === 0 ? 7 : hoyJS;
-    const hoyFecha = new Date().toISOString().slice(0, 10); // formato YYYY-MM-DD
+    const hoyJS = new Date();
+    const hoy = hoyJS.getDay() === 0 ? 7 : hoyJS.getDay();
+    // Usar la fecha local en formato YYYY-MM-DD
+    const hoyFecha = hoyJS.toLocaleDateString('sv-SE');
     const ahora = new Date();
+
+    console.log('Hoy:', hoy, 'Fecha actual:', hoyFecha, 'Hora actual:', ahora.toLocaleString());
+    console.log('Horarios recibidos:', this.horariosRaw);
 
     // Filtrar todos los horarios válidos para hoy
     const horariosHoy = this.horariosRaw.filter((turno: any) => {
-      // Validar fecha
-      if (turno.fechaInicio && turno.fechaFin) {
-        if (hoyFecha < turno.fechaInicio || hoyFecha > turno.fechaFin) return false;
-      }
-      // Normaliza y separa los días como números
-      let diasArr: number[] = [];
-      if (Array.isArray(turno.dias)) {
-        diasArr = turno.dias.map((d: any) => Number(d));
-      } else if (typeof turno.dias === 'string') {
-        if (/^\d(,\d)*$/.test(turno.dias.replace(/\s/g, ''))) {
+      // Si tiene fecha de fin de repetición, validar el rango y el día
+      if (turno.fechaFinRepeticion) {
+        if (hoyFecha < turno.fechaInicio || hoyFecha > turno.fechaFinRepeticion) return false;
+        // Validar día de la semana
+        let diasArr: number[] = [];
+        if (Array.isArray(turno.dias)) {
+          diasArr = turno.dias.map((d: any) => Number(d));
+        } else if (typeof turno.dias === 'string') {
           diasArr = turno.dias.split(',').map((d: string) => Number(d));
-        } else {
-          // Si es un string con el nombre del día
-          const nombreDia = turno.dias.trim().toLowerCase();
-          const nombresDias = ['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
-          const idx = nombresDias.indexOf(nombreDia);
-          if (idx !== -1) {
-            diasArr = [idx + 1]; // lunes=1, ..., domingo=7
-          }
+        } else if (typeof turno.dias === 'number') {
+          diasArr = [Number(turno.dias)];
         }
-      } else if (typeof turno.dias === 'number') {
-        diasArr = [Number(turno.dias)];
+        return diasArr.includes(hoy);
       }
-      // Si el campo es null o vacío, intenta deducir el día de la fecha de inicio
-      if ((!diasArr || diasArr.length === 0) && turno.fechaInicio) {
-        const fecha = new Date(turno.fechaInicio);
-        const diaFecha = fecha.getDay() === 0 ? 7 : fecha.getDay();
-        diasArr = [diaFecha];
-      }
-      return diasArr.includes(hoy);
+      // Si NO tiene fecha de fin de repetición, solo se marca si la fecha de hoy es igual a la fecha de inicio
+      return turno.fechaInicio === hoyFecha;
     });
 
-    // Seleccionar el próximo horario cuya hora de fin de rango aún no ha pasado
+    console.log('Horarios filtrados para hoy:', horariosHoy);
+
+    // Seleccionar el horario vigente (dentro del rango permitido) o el próximo horario futuro
+    let horarioVigente = null;
     let proximoHorario = null;
+    let menorDiferencia = Infinity;
     for (const turno of horariosHoy) {
-      // Adaptar nombres de campos
-      const toleranciaInicioDespues = turno.toleranciaInicioDespues ?? 0;
-      const atrasoPermitido = turno.atrasoPermitido ?? 0;
-      const toleranciaFinDespues = turno.toleranciaFinDespues ?? 0;
+      const toleranciaInicioAntes = Number(turno.toleranciaInicioAntes ?? turno.tolerancia_inicio_antes ?? 0);
+      const toleranciaFinDespues = Number(turno.toleranciaFinDespues ?? turno.tolerancia_fin_despues ?? 0);
+      const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
 
       const horaInicioStr = turno.horaInicio.length > 5 ? turno.horaInicio.slice(0,5) : turno.horaInicio;
       const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
-      const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
-      const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
 
-      const finPuntual = new Date(horaInicio.getTime() + toleranciaInicioDespues * 60000);
-      const finAtraso = new Date(finPuntual.getTime() + atrasoPermitido * 60000);
-      const finSalida = new Date(horaFin.getTime() + toleranciaFinDespues * 60000);
+      // Forzar que la fecha sea un string YYYY-MM-DD en local time
+      let fechaTurno: string;
+      if (typeof turno.fechaInicio === 'string') {
+        fechaTurno = turno.fechaInicio;
+      } else if (turno.fechaInicio instanceof Date) {
+        fechaTurno = turno.fechaInicio.toLocaleDateString('sv-SE');
+      } else {
+        fechaTurno = hoyFecha;
+      }
+      // Usar la función crearFechaLocal para evitar desfases
+      const horaInicio = this.crearFechaLocal(fechaTurno, horaInicioStr);
+      const horaFin = this.crearFechaLocal(fechaTurno, horaFinStr);
 
-      // Si la hora actual está dentro de cualquier rango permitido
-      if (ahora <= finAtraso || ahora <= finSalida) {
-        proximoHorario = turno;
+      const inicioRango = new Date(horaInicio.getTime() - toleranciaInicioAntes * 60000);
+      const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+
+      // Si la hora actual está dentro del rango permitido, este es el horario vigente
+      if (ahora >= inicioRango && ahora <= finRango) {
+        horarioVigente = turno;
         break;
       }
+      // Si la hora actual está antes del inicio del rango, es un posible próximo horario
+      if (ahora < inicioRango) {
+        const diferencia = inicioRango.getTime() - ahora.getTime();
+        if (diferencia < menorDiferencia) {
+          menorDiferencia = diferencia;
+          proximoHorario = turno;
+        }
+      }
     }
-
-    this.horarioHoy = proximoHorario;
+    // Si ya pasó el rango permitido de todos los horarios, no mostrar ninguno
+    if (!horarioVigente && !proximoHorario) {
+      this.horarioHoy = null;
+    } else {
+      this.horarioHoy = horarioVigente || proximoHorario || null;
+    }
 
     if (this.horarioHoy) {
       // Adaptar los nombres de los campos al formato que usa el frontend
-      this.horarioHoy.tolerancia_inicio_antes = this.horarioHoy.toleranciaInicioAntes;
-      this.horarioHoy.tolerancia_inicio_despues = this.horarioHoy.toleranciaInicioDespues;
-      this.horarioHoy.tolerancia_fin_despues = this.horarioHoy.toleranciaFinDespues;
-      this.horarioHoy.atraso_permitido = this.horarioHoy.atrasoPermitido;
+      this.horarioHoy.tolerancia_inicio_antes = this.horarioHoy.toleranciaInicioAntes ?? this.horarioHoy.tolerancia_inicio_antes;
+      this.horarioHoy.tolerancia_inicio_despues = this.horarioHoy.toleranciaInicioDespues ?? this.horarioHoy.tolerancia_inicio_despues;
+      this.horarioHoy.tolerancia_fin_despues = this.horarioHoy.toleranciaFinDespues ?? this.horarioHoy.tolerancia_fin_despues;
+      this.horarioHoy.atraso_permitido = this.horarioHoy.atrasoPermitido ?? this.horarioHoy.atraso_permitido;
       this.userLocations = [{ lat: this.horarioHoy.ubicacionLat, lng: this.horarioHoy.ubicacionLng }];
       this.addUserLocationsMarkers();
     } else {
@@ -314,43 +335,39 @@ export class InicioPage implements AfterViewInit {
       return;
     }
 
-    // Obtener usuario autenticado
     const user = await this.authService.user$.pipe(take(1)).toPromise();
     if (!user || !user.id) {
       alert("❌ Usuario no autenticado.");
       return;
     }
 
-    const hoyFecha = new Date().toISOString().slice(0, 10);
+    const hoyDateObj = new Date();
+    const hoyFecha = hoyDateObj.toLocaleDateString('sv-SE');
     const ahora = new Date();
     const hora = ahora.toTimeString().slice(0,8);
 
-    // Calcular estado y motivo según la lógica de negocio en el frontend
     const { estado, motivo } = this.calcularEstadoYMotivo(ahora, this.horarioHoy, this.actualLocation, tipo);
 
-    // Si está fuera de rango, no permitir marcar
     if (estado === 'fuera_de_rango') {
       alert('⛔ Fuera del rango permitido para marcar asistencia.');
       return;
     }
 
     const payload: any = {
-      user_id: user.id,
-      horario_id: this.horarioHoy.id,
+      userId: user.id,
+      horarioId: this.horarioHoy.id,
       fecha: hoyFecha,
       hora: hora,
       lat: this.actualLocation.lat,
       lng: this.actualLocation.lng,
-      estado: estado,
-      motivo: motivo,
-      tipo: tipo, // 'entrada' o 'salida'
-      atraso_permitido: this.horarioHoy.atraso_permitido // <-- Aseguramos que se envía
+      estado: estado,         
+      motivo: motivo          
     };
-
+    
     try {
-      const respuesta: any = await this.horarioService.marcarAsistencia(payload);
-      if (respuesta.estado === 'fuera_de_zona') {
-        alert('❗ Atención: Estás fuera de la zona permitida. Tu asistencia fue registrada como fuera de zona.');
+      const respuesta: any = await this.asistenciaService.marcarAsistencia(payload); // ✅ CAMBIO AQUÍ
+      if (estado === 'fuera_de_zona') {
+        alert('❗ Atención: Marcaste fuera de la zona permitida. Tu asistencia fue registrada como fuera de zona.');
       } else if (respuesta.estado === 'entrada') {
         alert('✅ Asistencia de entrada registrada correctamente.');
       } else if (respuesta.estado === 'salida') {
@@ -365,8 +382,12 @@ export class InicioPage implements AfterViewInit {
     }
   }
 
-  calcularEstadoYMotivo(ahora: Date, horario: any, ubicacion: {lat: number, lng: number}, tipo: 'entrada' | 'salida' = 'entrada') {
-    // Usar los campos de la base de datos
+  calcularEstadoYMotivo(
+    ahora: Date,
+    horario: any,
+    ubicacion: { lat: number, lng: number },
+    tipo: 'entrada' | 'salida' = 'entrada'
+  ) {
     const toleranciaAntes = horario.tolerancia_inicio_antes || 0;
     const toleranciaDespues = horario.tolerancia_inicio_despues || 0;
     const atrasoPermitido = horario.atraso_permitido || 0;
@@ -378,26 +399,18 @@ export class InicioPage implements AfterViewInit {
     const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
     const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
 
-    const inicioPuntual = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
+    ahora.setSeconds(0, 0);
+
+    const inicioRango = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
+    const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+
+    // Para puntualidad y atraso
     const finPuntual = new Date(horaInicio.getTime() + toleranciaDespues * 60000);
     const finAtraso = new Date(finPuntual.getTime() + atrasoPermitido * 60000);
+
+    // Para salida
     const inicioSalida = horaFin;
     const finSalida = new Date(horaFin.getTime() + toleranciaFinDespues * 60000);
-
-    // LOGS DETALLADOS PARA DEPURACIÓN
-    console.log('--- DEPURACIÓN DE RANGO DE ASISTENCIA ---');
-    console.log('ahora:', ahora, '(', ahora.toLocaleString(), ')');
-    console.log('horaInicio:', horaInicio, '(', horaInicio.toLocaleString(), ')');
-    console.log('horaFin:', horaFin, '(', horaFin.toLocaleString(), ')');
-    console.log('toleranciaAntes:', toleranciaAntes);
-    console.log('toleranciaDespues:', toleranciaDespues);
-    console.log('atrasoPermitido:', atrasoPermitido);
-    console.log('toleranciaFinDespues:', toleranciaFinDespues);
-    console.log('inicioPuntual:', inicioPuntual, '(', inicioPuntual.toLocaleString(), ')');
-    console.log('finPuntual:', finPuntual, '(', finPuntual.toLocaleString(), ')');
-    console.log('finAtraso:', finAtraso, '(', finAtraso.toLocaleString(), ')');
-    console.log('inicioSalida:', inicioSalida, '(', inicioSalida.toLocaleString(), ')');
-    console.log('finSalida:', finSalida, '(', finSalida.toLocaleString(), ')');
 
     // Verificar si está dentro de la zona
     const distancia = this.calculateDistance(
@@ -406,38 +419,34 @@ export class InicioPage implements AfterViewInit {
     );
     const dentroDeZona = distancia <= this.zoneRadius;
 
-    if (tipo === 'entrada') {
-      if (ahora >= inicioPuntual && ahora <= finPuntual) {
-        // Puntual
-        if (dentroDeZona) {
-          return { estado: 'entrada', motivo: 'Marcó en el rango permitido' };
-        } else {
-          return { estado: 'fuera_de_zona', motivo: 'Fuera de la zona permitida' };
-        }
-      } else if (ahora > finPuntual && ahora <= finAtraso) {
-        // Atraso
-        if (dentroDeZona) {
-          return { estado: 'atraso', motivo: 'Marcó en el rango de atraso' };
-        } else {
-          return { estado: 'fuera_de_zona', motivo: 'Fuera de la zona permitida (atraso)' };
-        }
-      } else {
-        // Fuera de rango, no se permite marcar
-        return { estado: 'fuera_de_rango', motivo: 'Fuera del rango permitido para marcar asistencia' };
+    // Permitir marcar durante todo el rango
+    if (ahora >= inicioRango && ahora <= finRango) {
+      // Entrada puntual
+      if (ahora >= inicioRango && ahora <= finPuntual) {
+        return dentroDeZona
+          ? { estado: 'entrada', motivo: 'Marcó en el rango permitido (puntual)' }
+          : { estado: 'fuera_de_zona', motivo: 'Marcó fuera de la zona permitida (puntual)' };
       }
-    } else if (tipo === 'salida') {
+      // Entrada con atraso
+      if (ahora > finPuntual && ahora <= finAtraso) {
+        return dentroDeZona
+          ? { estado: 'atraso', motivo: 'Marcó en el rango de atraso' }
+          : { estado: 'fuera_de_zona', motivo: 'Marcó fuera de la zona permitida (atraso)' };
+      }
+      // Salida
       if (ahora >= inicioSalida && ahora <= finSalida) {
-        if (dentroDeZona) {
-          return { estado: 'salida', motivo: 'Salida registrada en el rango permitido' };
-        } else {
-          return { estado: 'fuera_de_zona', motivo: 'Salida fuera de la zona permitida' };
-        }
-      } else {
-        return { estado: 'fuera_de_rango', motivo: 'Fuera del rango permitido para marcar salida' };
+        return dentroDeZona
+          ? { estado: 'salida', motivo: 'Salida registrada en el rango permitido' }
+          : { estado: 'fuera_de_zona', motivo: 'Salida fuera de la zona permitida' };
       }
+      // Si está dentro del rango pero no es entrada ni salida, se puede registrar como presente (o como desees)
+      return dentroDeZona
+        ? { estado: 'presente', motivo: 'Marcó durante el horario vigente' }
+        : { estado: 'fuera_de_zona', motivo: 'Marcó fuera de la zona permitida (vigente)' };
     }
-    // Por defecto
-    return { estado: 'fuera_de_rango', motivo: 'Condición no identificada' };
+
+    // Fuera de rango
+    return { estado: 'fuera_de_rango', motivo: 'Fuera del rango permitido para marcar asistencia' };
   }
 
   // ✅ Método para calcular la distancia entre dos puntos
@@ -528,5 +537,34 @@ export class InicioPage implements AfterViewInit {
     } else {
       alert('⛔ Fuera del rango permitido para marcar asistencia.');
     }
+  }
+
+  esHorarioVigente(): boolean {
+    if (!this.horarioHoy) return false;
+    const hoyDateObj = new Date();
+    const hoyFecha = `${hoyDateObj.getFullYear()}-${String(hoyDateObj.getMonth() + 1).padStart(2, '0')}-${String(hoyDateObj.getDate()).padStart(2, '0')}`;
+    const ahora = new Date();
+
+    const toleranciaInicioAntes = Number(this.horarioHoy.toleranciaInicioAntes ?? this.horarioHoy.tolerancia_inicio_antes ?? 0);
+    const toleranciaFinDespues = Number(this.horarioHoy.toleranciaFinDespues ?? this.horarioHoy.tolerancia_fin_despues ?? 0);
+    const atrasoPermitido = Number(this.horarioHoy.atrasoPermitido ?? this.horarioHoy.atraso_permitido ?? 0);
+
+    const horaInicioStr = this.horarioHoy.horaInicio.length > 5 ? this.horarioHoy.horaInicio.slice(0,5) : this.horarioHoy.horaInicio;
+    const horaFinStr = this.horarioHoy.horaFin.length > 5 ? this.horarioHoy.horaFin.slice(0,5) : this.horarioHoy.horaFin;
+
+    const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
+    const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
+
+    const inicioRango = new Date(horaInicio.getTime() - toleranciaInicioAntes * 60000);
+    const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+
+    return ahora >= inicioRango && ahora <= finRango;
+  }
+
+  // Utilidad para crear fechas en local y evitar desfases de zona horaria
+  crearFechaLocal(fecha: string, hora: string): Date {
+    const [year, month, day] = fecha.split('-').map(Number);
+    const [h, m, s] = hora.split(':').map(Number);
+    return new Date(year, month - 1, day, h, m, s || 0);
   }
 }

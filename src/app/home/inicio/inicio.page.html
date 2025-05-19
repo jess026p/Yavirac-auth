@@ -6,11 +6,24 @@
       <ion-card-title>Horario del Día</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <p>
-         Hoy es: <strong>{{ horarioHoy ? diasToNombres(horarioHoy.dias) : 'Sin horario asignado hoy' }}</strong> <br />
-        ⏰ Horario: <strong>{{ horarioHoy ? (horarioHoy.horaInicio.slice(0,5) + ' - ' + horarioHoy.horaFin.slice(0,5)) : '--:--' }}</strong> <br />
-        🗓️ Vigencia: <strong>{{ horarioHoy ? (horarioHoy.fechaInicio + ' - ' + horarioHoy.fechaFin) : '-' }}</strong>
-      </p>
+      <ng-container *ngIf="horarioHoy; else sinHorario">
+        <p>
+          Hoy es: <strong>{{ diasToNombres(horarioHoy.dias) }}</strong> <br />
+          ⏰ Horario: <strong>{{ horarioHoy.horaInicio.slice(0,5) }} - {{ horarioHoy.horaFin.slice(0,5) }}</strong> <br />
+          🗓️ Vigencia: <strong>{{ horarioHoy.fechaInicio }} - {{ horarioHoy.fechaFin }}</strong>
+        </p>
+        <p *ngIf="esHorarioVigente(); else proximoHorario">
+          <ion-badge color="success">Horario vigente</ion-badge>
+        </p>
+        <ng-template #proximoHorario>
+          <ion-badge color="warning">Próximo horario (aún no inicia)</ion-badge>
+        </ng-template>
+      </ng-container>
+      <ng-template #sinHorario>
+        <p class="ion-text-center ion-padding">
+          No tienes horarios vigentes para marcar asistencia en este momento.
+        </p>
+      </ng-template>
       <ion-button expand="full" (click)="alternarHorarios()">
         {{ mostrarTodosHorarios ? 'Ocultar' : 'Mostrar' }} todos los horarios
       </ion-button>

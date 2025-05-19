@@ -16,10 +16,5 @@ export class HorarioService {
     }).toPromise();
   }
 
-  async marcarAsistencia(payload: any) {
-    const token = await this.storage.get('token');
-    return this.http.post(`${environment.apiUrl}/asistencias/marcar`, payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).toPromise();
-  }
+
 } 
