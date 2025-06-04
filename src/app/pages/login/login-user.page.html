@@ -1,37 +1,103 @@
 <ion-header class="ion-no-border">
-  <ion-toolbar></ion-toolbar>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/login"></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
 </ion-header>
 
-<ion-content>
-  <ion-card class="ion-no-margin">
-    <ion-img class="logo" src="assets/imagenes/logo_loginYavirac.png"></ion-img>
-    <ion-card-header>
-      <ion-card-title style="text-align: center;">
-        Iniciar Sesión
-      </ion-card-title>
-      <ion-card-subtitle class="ion-text-lowercase" style="text-align: center;">
-        ingresa tus credenciales para acceder
-      </ion-card-subtitle>
-    </ion-card-header>
-    <ion-card-content>
-      <form (ngSubmit)="login()">
-        <ion-item>
-          <ion-label position="floating">Usuario</ion-label>
-          <ion-input type="text" [(ngModel)]="username" name="username" required></ion-input>
-        </ion-item>
-        <ion-item>
-          <ion-label position="floating">Contraseña</ion-label>
-          <ion-input type="password" [(ngModel)]="password" name="password" required></ion-input>
-        </ion-item>
-        <div class="signin-btns" style="display: flex; flex-direction: column; gap: 18px; margin-top: 32px; align-items: center;">
-          <ion-button expand="block" size="large" fill="solid" shape="round" class="loginbtn" type="submit" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
-            INICIAR SESIÓN
-          </ion-button>
-          <ion-button expand="block" size="large" fill="outline" shape="round" class="loginbtn" routerLink="/login-screen" style="font-size: 1.1em; font-weight: bold; letter-spacing: 1px;">
-            INICIAR POR HUELLA
-          </ion-button>
-        </div>
-      </form>
-    </ion-card-content>
-  </ion-card>
-</ion-content> 
+<ion-content class="ion-padding">
+  <div class="login-container">
+    <ion-card>
+      <ion-img class="logo" src="assets/imagenes/logo_loginYavirac.png"></ion-img>
+      
+      <ion-card-header>
+        <ion-card-title class="ion-text-center">Iniciar Sesión</ion-card-title>
+        <ion-card-subtitle class="ion-text-center">Ingresa tus credenciales para acceder</ion-card-subtitle>
+      </ion-card-header>
+
+      <ion-card-content>
+        <form (ngSubmit)="login()" #loginForm="ngForm" class="login-form">
+          <ion-item>
+            <ion-label position="floating">Usuario</ion-label>
+            <ion-input type="text" [(ngModel)]="username" name="username" required></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Contraseña</ion-label>
+            <ion-input type="password" [(ngModel)]="password" name="password" required></ion-input>
+          </ion-item>
+
+          <ion-item lines="none">
+            <ion-checkbox [(ngModel)]="rememberMe" name="rememberMe">Recordarme</ion-checkbox>
+          </ion-item>
+
+          <div class="btn-center">
+            <ion-button expand="block" type="submit" [disabled]="loading" class="loginbtn">
+              <ion-spinner *ngIf="loading" name="crescent"></ion-spinner>
+              <span *ngIf="!loading">INICIAR SESIÓN</span>
+            </ion-button>
+          </div>
+
+          <div class="ion-text-center">
+            <ion-button fill="outline" (click)="loginWithBiometric()" class="loginbtn">
+              <ion-icon name="finger-print-outline" slot="start"></ion-icon>
+              INICIAR POR HUELLA
+            </ion-button>
+          </div>
+        </form>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
+
+<style>
+  .login-container {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  ion-card {
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .logo {
+    width: 200px;
+    height: auto;
+    margin: 20px auto;
+    display: block;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  ion-item {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .btn-center {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .loginbtn {
+    margin-top: 20px;
+    font-size: 1.1em;
+    font-weight: bold;
+    letter-spacing: 1px;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  ion-button[fill="outline"] {
+    --border-width: 2px;
+  }
+</style> 

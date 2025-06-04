@@ -1,4 +1,4 @@
-import { Component, AfterViewInit } from '@angular/core';
+import { Component, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
@@ -18,7 +18,27 @@ import { HorarioService } from '../../services/horario.service';
 import { AuthService } from '../../services/auth.service';
 import { take } from 'rxjs/operators';
 import { AsistenciaService } from '../../services/asistencia.service';
+import { AlertController } from '@ionic/angular';
 
+function getFechaLocal(): string {
+  const hoy = new Date();
+  const year = hoy.getFullYear();
+  const month = String(hoy.getMonth() + 1).padStart(2, '0');
+  const day = String(hoy.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Utilidad para crear fechas en la zona horaria de Ecuador (GMT-5)
+function crearFechaEcuador(fecha: string, hora: string): Date {
+  // fecha: '2025-06-04', hora: '12:13:00'
+  const [year, month, day] = fecha.split('-').map(Number);
+  const [h, m, s] = hora.split(':').map(Number);
+  // Crea la fecha en UTC y ajusta a GMT-5
+  const date = new Date(Date.UTC(year, month - 1, day, h, m, s || 0));
+  // Ajusta a GMT-5 (Ecuador)
+  date.setHours(date.getHours() - 5);
+  return date;
+}
 
 @Component({
   selector: 'app-inicio',
@@ -46,10 +66,20 @@ export class InicioPage implements AfterViewInit {
 
   public mapInitialized = false;
 
+  nombreDiaHoy: string = '';
+  fechaHoy: string = '';
+  horariosDelDia: any[] = [];
+  estadoHorarios: { [id: string]: any } = {};
+  horarioVigente: boolean = false;
+  horarioVigenteObj: any = null;
+  horariosPendientes: any[] = [];
+
 constructor(
   private horarioService: HorarioService,
   private authService: AuthService,
-  private asistenciaService: AsistenciaService // ✅ agregado correctamente
+  private asistenciaService: AsistenciaService, // ✅ agregado correctamente
+  private cdr: ChangeDetectorRef,
+  private alertCtrl: AlertController
 ) {}
 
   async ngAfterViewInit() {
@@ -63,6 +93,7 @@ constructor(
     // Carga horarios y ubicación en paralelo
     this.loadUserHorariosYUbicacion();
     this.getActualLocation();
+    await this.checkPasswordChange();
   }
 
   // Convierte un número de día (1-7) a nombre de día
@@ -94,7 +125,7 @@ constructor(
 
   async loadUserHorariosYUbicacion() {
     // Obtener el usuario autenticado
-    const user = await this.authService.user$.pipe(take(1)).toPromise();
+    const user = this.authService.getUser();
     if (!user || !user.id) return;
     const response: any = await this.horarioService.getUserLocations(user.id);
     const data = response.data || [];
@@ -110,99 +141,81 @@ constructor(
     this.setHorarioHoyYUbicacion();
   }
 
-  setHorarioHoyYUbicacion() {
-    // Obtener el día actual en formato 1-7 (lunes=1, ..., domingo=7)
+  async setHorarioHoyYUbicacion() {
     const hoyJS = new Date();
-    const hoy = hoyJS.getDay() === 0 ? 7 : hoyJS.getDay();
-    // Usar la fecha local en formato YYYY-MM-DD
-    const hoyFecha = hoyJS.toLocaleDateString('sv-SE');
-    const ahora = new Date();
-
-    console.log('Hoy:', hoy, 'Fecha actual:', hoyFecha, 'Hora actual:', ahora.toLocaleString());
-    console.log('Horarios recibidos:', this.horariosRaw);
-
-    // Filtrar todos los horarios válidos para hoy
-    const horariosHoy = this.horariosRaw.filter((turno: any) => {
-      // Si tiene fecha de fin de repetición, validar el rango y el día
-      if (turno.fechaFinRepeticion) {
-        if (hoyFecha < turno.fechaInicio || hoyFecha > turno.fechaFinRepeticion) return false;
-        // Validar día de la semana
-        let diasArr: number[] = [];
-        if (Array.isArray(turno.dias)) {
-          diasArr = turno.dias.map((d: any) => Number(d));
-        } else if (typeof turno.dias === 'string') {
-          diasArr = turno.dias.split(',').map((d: string) => Number(d));
-        } else if (typeof turno.dias === 'number') {
-          diasArr = [Number(turno.dias)];
-        }
-        return diasArr.includes(hoy);
+    const hoy = hoyJS.getDay();
+    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const hoyNombre = diasSemana[hoy];
+    const hoyNum = hoy === 0 ? 7 : hoy; // domingo=7
+    const hoyFecha = getFechaLocal();
+    this.nombreDiaHoy = hoyNombre;
+    this.fechaHoy = hoyJS.toLocaleDateString('es-EC');
+    // Filtrar todos los horarios del día
+    this.horariosDelDia = this.horariosRaw.filter((turno: any) => {
+      const fechaInicio = turno.fechaInicio || turno.fecha_inicio;
+      const fechaFinRepeticion = turno.fechaFinRepeticion || turno.fecha_fin_repeticion || fechaInicio;
+      if (!fechaInicio || !fechaFinRepeticion) return false;
+      if (hoyFecha < fechaInicio || hoyFecha > fechaFinRepeticion) return false;
+      let diasArr: string[] = [];
+      if (Array.isArray(turno.dias)) {
+        diasArr = turno.dias.map((d: any) => d.toString().toLowerCase().trim());
+      } else if (typeof turno.dias === 'string') {
+        diasArr = turno.dias.split(',').map((d: string) => d.toLowerCase().trim());
       }
-      // Si NO tiene fecha de fin de repetición, solo se marca si la fecha de hoy es igual a la fecha de inicio
-      return turno.fechaInicio === hoyFecha;
+      // Solo el día de hoy
+      return diasArr.includes(hoyNombre.toLowerCase());
     });
-
-    console.log('Horarios filtrados para hoy:', horariosHoy);
-
-    // Seleccionar el horario vigente (dentro del rango permitido) o el próximo horario futuro
-    let horarioVigente = null;
-    let proximoHorario = null;
-    let menorDiferencia = Infinity;
-    for (const turno of horariosHoy) {
-      const toleranciaInicioAntes = Number(turno.toleranciaInicioAntes ?? turno.tolerancia_inicio_antes ?? 0);
-      const toleranciaFinDespues = Number(turno.toleranciaFinDespues ?? turno.tolerancia_fin_despues ?? 0);
-      const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
-
-      const horaInicioStr = turno.horaInicio.length > 5 ? turno.horaInicio.slice(0,5) : turno.horaInicio;
-      const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
-
-      // Forzar que la fecha sea un string YYYY-MM-DD en local time
-      let fechaTurno: string;
-      if (typeof turno.fechaInicio === 'string') {
-        fechaTurno = turno.fechaInicio;
-      } else if (turno.fechaInicio instanceof Date) {
-        fechaTurno = turno.fechaInicio.toLocaleDateString('sv-SE');
-      } else {
-        fechaTurno = hoyFecha;
+    // Eliminar duplicados por id (por si el admin actualiza un horario)
+    const horariosUnicos: any = {};
+    this.horariosDelDia.forEach((h: any) => { horariosUnicos[h.id] = h; });
+    this.horariosDelDia = Object.values(horariosUnicos);
+    this.estadoHorarios = {};
+    this.horarioVigenteObj = null;
+    this.horariosPendientes = [];
+    for (let i = 0; i < this.horariosDelDia.length; i++) {
+      const turno = this.horariosDelDia[i];
+      const siguiente = this.horariosDelDia[i+1] || null;
+      const estado = await this.getEstadoHorario(turno, siguiente);
+      this.estadoHorarios[turno.id] = estado;
+      if (!this.horarioVigenteObj && estado.vigente) {
+        this.horarioVigenteObj = turno;
       }
-      // Usar la función crearFechaLocal para evitar desfases
-      const horaInicio = this.crearFechaLocal(fechaTurno, horaInicioStr);
-      const horaFin = this.crearFechaLocal(fechaTurno, horaFinStr);
-
-      const inicioRango = new Date(horaInicio.getTime() - toleranciaInicioAntes * 60000);
-      const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
-
-      // Si la hora actual está dentro del rango permitido, este es el horario vigente
-      if (ahora >= inicioRango && ahora <= finRango) {
-        horarioVigente = turno;
-        break;
+      if (estado.accion === 'salida' && estado.badge && !estado.puedeMarcar) {
+        this.horariosPendientes.push(turno);
       }
-      // Si la hora actual está antes del inicio del rango, es un posible próximo horario
-      if (ahora < inicioRango) {
-        const diferencia = inicioRango.getTime() - ahora.getTime();
-        if (diferencia < menorDiferencia) {
-          menorDiferencia = diferencia;
-          proximoHorario = turno;
+    }
+    // NUEVO: Si no hay horarioHoy por rango, buscar por asistencias (entrada y no salida)
+    if (!this.horarioVigenteObj) {
+      const user = this.authService.getUser();
+      if (user && user.id) {
+        const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
+        const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+        for (const turno of this.horariosRaw) {
+          const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'entrada' || a.estado === 'atraso'));
+          const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && a.estado === 'salida');
+          if (yaEntrada && !yaSalida) {
+            this.horarioVigenteObj = turno;
+            break;
+          }
         }
       }
     }
-    // Si ya pasó el rango permitido de todos los horarios, no mostrar ninguno
-    if (!horarioVigente && !proximoHorario) {
+    if (this.horarioVigenteObj) {
+      this.horarioHoy = this.horarioVigenteObj;
+      const lat = this.horarioVigenteObj.ubicacionLat || this.horarioVigenteObj.lat;
+      const lng = this.horarioVigenteObj.ubicacionLng || this.horarioVigenteObj.lng;
+      if (lat && lng) {
+        this.userLocations = [{ lat: Number(lat), lng: Number(lng) }];
+      } else {
+        this.userLocations = [];
+      }
+    } else {
       this.horarioHoy = null;
-    } else {
-      this.horarioHoy = horarioVigente || proximoHorario || null;
-    }
-
-    if (this.horarioHoy) {
-      // Adaptar los nombres de los campos al formato que usa el frontend
-      this.horarioHoy.tolerancia_inicio_antes = this.horarioHoy.toleranciaInicioAntes ?? this.horarioHoy.tolerancia_inicio_antes;
-      this.horarioHoy.tolerancia_inicio_despues = this.horarioHoy.toleranciaInicioDespues ?? this.horarioHoy.tolerancia_inicio_despues;
-      this.horarioHoy.tolerancia_fin_despues = this.horarioHoy.toleranciaFinDespues ?? this.horarioHoy.tolerancia_fin_despues;
-      this.horarioHoy.atraso_permitido = this.horarioHoy.atrasoPermitido ?? this.horarioHoy.atraso_permitido;
-      this.userLocations = [{ lat: this.horarioHoy.ubicacionLat, lng: this.horarioHoy.ubicacionLng }];
-      this.addUserLocationsMarkers();
-    } else {
       this.userLocations = [];
     }
+    this.addUserLocationsMarkers();
+    this.horarioVigente = await this.esHorarioVigente();
+    this.cdr.detectChanges();
   }
 
   addUserLocationsMarkers(retryCount = 0) {
@@ -335,14 +348,14 @@ constructor(
       return;
     }
 
-    const user = await this.authService.user$.pipe(take(1)).toPromise();
+    const user = this.authService.getUser();
     if (!user || !user.id) {
       alert("❌ Usuario no autenticado.");
       return;
     }
 
     const hoyDateObj = new Date();
-    const hoyFecha = hoyDateObj.toLocaleDateString('sv-SE');
+    const hoyFecha = getFechaLocal();
     const ahora = new Date();
     const hora = ahora.toTimeString().slice(0,8);
 
@@ -393,7 +406,7 @@ constructor(
     const atrasoPermitido = horario.atraso_permitido || 0;
     const toleranciaFinDespues = horario.tolerancia_fin_despues || 0;
 
-    const hoyFecha = new Date().toISOString().slice(0, 10);
+    const hoyFecha = getFechaLocal();
     const horaInicioStr = horario.horaInicio.length > 5 ? horario.horaInicio.slice(0,5) : horario.horaInicio;
     const horaFinStr = horario.horaFin.length > 5 ? horario.horaFin.slice(0,5) : horario.horaFin;
     const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
@@ -491,27 +504,29 @@ constructor(
   }
 
   verificarTipoMarcacionYAsistir() {
+    console.log('[Asistencia] horarioHoy:', this.horarioHoy);
+    console.log('[Asistencia] horarioVigenteObj:', this.horarioVigenteObj);
     if (!this.horarioHoy) {
       alert('❌ No tienes un horario asignado para hoy.');
       return;
     }
     const ahora = new Date();
-    const hoyFecha = new Date().toISOString().slice(0, 10);
+    const hoyFecha = getFechaLocal();
     const horaInicioStr = this.horarioHoy.horaInicio.length > 5 ? this.horarioHoy.horaInicio.slice(0,5) : this.horarioHoy.horaInicio;
     const horaFinStr = this.horarioHoy.horaFin.length > 5 ? this.horarioHoy.horaFin.slice(0,5) : this.horarioHoy.horaFin;
-    const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
-    const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
+    const horaInicio = crearFechaEcuador(hoyFecha, horaInicioStr);
+    const horaFin = crearFechaEcuador(hoyFecha, horaFinStr);
 
-    // Usar los campos de la base de datos
-    const toleranciaAntes = this.horarioHoy.tolerancia_inicio_antes || 0;
-    const toleranciaDespues = this.horarioHoy.tolerancia_inicio_despues || 0;
-    const atrasoPermitido = this.horarioHoy.atraso_permitido || 0;
-    const toleranciaFinDespues = this.horarioHoy.tolerancia_fin_despues || 0;
+    // Usar los campos de la base de datos (compatibilidad)
+    const toleranciaAntes = this.horarioHoy.toleranciaInicioAntes ?? this.horarioHoy.tolerancia_inicio_antes ?? 0;
+    const toleranciaDespues = this.horarioHoy.toleranciaInicioDespues ?? this.horarioHoy.tolerancia_inicio_despues ?? 0;
+    const atrasoPermitido = this.horarioHoy.atrasoPermitido ?? this.horarioHoy.atraso_permitido ?? 0;
+    const toleranciaFinDespues = this.horarioHoy.toleranciaFinDespues ?? this.horarioHoy.tolerancia_fin_despues ?? 0;
 
     const inicioPuntual = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
     const finPuntual = new Date(horaInicio.getTime() + toleranciaDespues * 60000);
     const finAtraso = new Date(finPuntual.getTime() + atrasoPermitido * 60000);
-    const inicioSalida = horaFin; // Puedes permitir antes si lo deseas
+    const inicioSalida = horaFin;
     const finSalida = new Date(horaFin.getTime() + toleranciaFinDespues * 60000);
 
     // Logs de depuración
@@ -528,43 +543,208 @@ constructor(
     console.log('Atraso permitido:', atrasoPermitido);
     console.log('Tolerancia fin después:', toleranciaFinDespues);
 
-    if ((ahora >= inicioPuntual && ahora <= finAtraso)) {
+    const ahoraEcuador = crearFechaEcuador(hoyFecha, ahora.toTimeString().slice(0,8));
+
+    if ((ahoraEcuador >= inicioPuntual && ahoraEcuador <= finAtraso)) {
       // Es entrada (puntual o atraso)
+      console.log('[Asistencia] Intentando marcar ENTRADA con horario:', this.horarioHoy);
       this.checkAttendance('entrada');
-    } else if (ahora >= inicioSalida && ahora <= finSalida) {
+    } else if (ahoraEcuador >= inicioSalida && ahoraEcuador <= finSalida) {
       // Es salida
+      console.log('[Asistencia] Intentando marcar SALIDA con horario:', this.horarioHoy);
       this.checkAttendance('salida');
     } else {
       alert('⛔ Fuera del rango permitido para marcar asistencia.');
     }
   }
 
-  esHorarioVigente(): boolean {
-    if (!this.horarioHoy) return false;
+  async esHorarioVigente(): Promise<boolean> {
+    if (!this.horarioVigenteObj) return false;
     const hoyDateObj = new Date();
-    const hoyFecha = `${hoyDateObj.getFullYear()}-${String(hoyDateObj.getMonth() + 1).padStart(2, '0')}-${String(hoyDateObj.getDate()).padStart(2, '0')}`;
+    const hoyFecha = getFechaLocal();
     const ahora = new Date();
-
-    const toleranciaInicioAntes = Number(this.horarioHoy.toleranciaInicioAntes ?? this.horarioHoy.tolerancia_inicio_antes ?? 0);
-    const toleranciaFinDespues = Number(this.horarioHoy.toleranciaFinDespues ?? this.horarioHoy.tolerancia_fin_despues ?? 0);
-    const atrasoPermitido = Number(this.horarioHoy.atrasoPermitido ?? this.horarioHoy.atraso_permitido ?? 0);
-
-    const horaInicioStr = this.horarioHoy.horaInicio.length > 5 ? this.horarioHoy.horaInicio.slice(0,5) : this.horarioHoy.horaInicio;
-    const horaFinStr = this.horarioHoy.horaFin.length > 5 ? this.horarioHoy.horaFin.slice(0,5) : this.horarioHoy.horaFin;
-
+    // Lógica de rango de tiempo
+    const toleranciaInicioAntes = Number(this.horarioVigenteObj.toleranciaInicioAntes ?? this.horarioVigenteObj.tolerancia_inicio_antes ?? 0);
+    const toleranciaFinDespues = Number(this.horarioVigenteObj.toleranciaFinDespues ?? this.horarioVigenteObj.tolerancia_fin_despues ?? 0);
+    const atrasoPermitido = Number(this.horarioVigenteObj.atrasoPermitido ?? this.horarioVigenteObj.atraso_permitido ?? 0);
+    const horaInicioStr = this.horarioVigenteObj.horaInicio.length > 5 ? this.horarioVigenteObj.horaInicio.slice(0,5) : this.horarioVigenteObj.horaInicio;
+    const horaFinStr = this.horarioVigenteObj.horaFin.length > 5 ? this.horarioVigenteObj.horaFin.slice(0,5) : this.horarioVigenteObj.horaFin;
     const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
     const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
-
     const inicioRango = new Date(horaInicio.getTime() - toleranciaInicioAntes * 60000);
     const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
-
+    // NUEVO: Si ya marcó entrada y no salida, sigue siendo vigente
+    const user = this.authService.getUser();
+    if (!user || !user.id) return false;
+    const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
+    const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+    const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(this.horarioVigenteObj.id) && (a.estado === 'entrada' || a.estado === 'atraso'));
+    const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(this.horarioVigenteObj.id) && a.estado === 'salida');
+    if (yaEntrada && !yaSalida) return true;
+    // Lógica original de rango de tiempo
     return ahora >= inicioRango && ahora <= finRango;
   }
 
-  // Utilidad para crear fechas en local y evitar desfases de zona horaria
-  crearFechaLocal(fecha: string, hora: string): Date {
-    const [year, month, day] = fecha.split('-').map(Number);
-    const [h, m, s] = hora.split(':').map(Number);
-    return new Date(year, month - 1, day, h, m, s || 0);
+  // Nueva lógica para entrada y salida
+  async getEstadoHorario(turno: any, siguienteHorario: any = null): Promise<{accion: string, badge: string, puedeMarcar: boolean, vigente: boolean}> {
+    const hoyFecha = getFechaLocal();
+    const horaInicioStr = turno.horaInicio.length > 5 ? turno.horaInicio.slice(0,5) : turno.horaInicio;
+    const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
+    const horaInicio = new Date(`${hoyFecha}T${horaInicioStr}`);
+    const horaFin = new Date(`${hoyFecha}T${horaFinStr}`);
+    const ahora = new Date();
+    const toleranciaAntes = Number(turno.toleranciaInicioAntes ?? turno.tolerancia_inicio_antes ?? 0);
+    const toleranciaDespues = Number(turno.toleranciaInicioDespues ?? turno.tolerancia_inicio_despues ?? 0);
+    const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
+    const inicioRango = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
+    // Fin de entrada (con atraso)
+    const finAtraso = new Date(horaInicio.getTime() + toleranciaDespues * 60000 + atrasoPermitido * 60000);
+    // Fin de vigencia para salida
+    let limiteFin = null;
+    if (siguienteHorario) {
+      const siguienteHoraInicioStr = siguienteHorario.horaInicio.length > 5 ? siguienteHorario.horaInicio.slice(0,5) : siguienteHorario.horaInicio;
+      const siguienteHoraInicio = new Date(`${hoyFecha}T${siguienteHoraInicioStr}`);
+      limiteFin = new Date(siguienteHoraInicio.getTime() - 10 * 60000);
+    }
+    const user = this.authService.getUser();
+    if (!user || !user.id) return {accion: '', badge: 'Sin usuario', puedeMarcar: false, vigente: false};
+    const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
+    const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+    const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && a.estado === 'entrada');
+    const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && a.estado === 'salida');
+
+    // Entrada: solo dentro de tolerancias
+    if (!yaEntrada && ahora >= inicioRango && ahora <= finAtraso) return {accion: 'entrada', badge: '', puedeMarcar: true, vigente: true};
+    // Salida: solo después de horaFin, sin restricción de atraso, y antes del límite de cruce
+    if (yaEntrada && !yaSalida && ahora >= horaFin && (!limiteFin || ahora < limiteFin)) return {accion: 'salida', badge: 'Pendiente de salida', puedeMarcar: true, vigente: true};
+    // Si ya marcó ambos
+    if (yaEntrada && yaSalida) return {accion: '', badge: 'Completado', puedeMarcar: false, vigente: false};
+    // Si está fuera de rango de entrada
+    if (!yaEntrada && ahora < inicioRango) return {accion: '', badge: 'Próximo horario', puedeMarcar: false, vigente: false};
+    if (!yaEntrada && ahora > finAtraso) return {accion: '', badge: 'No marcaste entrada', puedeMarcar: false, vigente: false};
+    // Si está fuera de rango de salida (por cruce)
+    if (yaEntrada && !yaSalida && limiteFin && ahora >= limiteFin) return {accion: '', badge: 'Horario finalizado por cruce', puedeMarcar: false, vigente: false};
+    return {accion: '', badge: 'Fuera de horario', puedeMarcar: false, vigente: false};
+  }
+
+  async checkPasswordChange() {
+    const token = localStorage.getItem('token');
+    const user = this.authService.getUser();
+    console.log('[CambioContraseña] Token:', token);
+    console.log('[CambioContraseña] User:', user);
+    if (!token || !user || !user.id) {
+      console.warn('[CambioContraseña] No hay token o usuario válido. Cerrando sesión.');
+      this.authService.logout();
+      window.location.href = '/login';
+      return;
+    }
+    if (user.passwordChanged === false) {
+      await this.showChangePasswordAlert(user.id);
+    }
+  }
+
+  async showChangePasswordAlert(userId: string) {
+    const token = localStorage.getItem('token');
+    const user = this.authService.getUser();
+    console.log('[AlertCambioContraseña] Token:', token);
+    console.log('[AlertCambioContraseña] userId:', userId, 'user.id:', user?.id);
+    if (!token || !user || !user.id) {
+      console.warn('[AlertCambioContraseña] No hay token o usuario válido. Cerrando sesión.');
+      this.authService.logout();
+      window.location.href = '/login';
+      return;
+    }
+    if (userId !== user.id) {
+      console.error('[AlertCambioContraseña] userId de la URL no coincide con el usuario autenticado. Cerrando sesión.');
+      this.authService.logout();
+      window.location.href = '/login';
+      return;
+    }
+    const alert = await this.alertCtrl.create({
+      header: 'Cambio de Contraseña',
+      message: 'Por seguridad, debe cambiar su contraseña en su primer inicio de sesión. La contraseña debe tener al menos 8 caracteres.',
+      inputs: [
+        {
+          name: 'newPassword',
+          type: 'password',
+          placeholder: 'Ingrese su nueva contraseña',
+          attributes: {
+            minlength: 8,
+            required: true
+          }
+        },
+        {
+          name: 'confirmPassword',
+          type: 'password',
+          placeholder: 'Confirme su nueva contraseña',
+          attributes: {
+            minlength: 8,
+            required: true
+          }
+        }
+      ],
+      buttons: [
+        {
+          text: 'Cambiar',
+          handler: async (data) => {
+            if (!data.newPassword || !data.confirmPassword) {
+              await this.showToast('Por favor complete todos los campos', 'warning');
+              return false;
+            }
+            if (data.newPassword.length < 8) {
+              await this.showToast('La contraseña debe tener al menos 8 caracteres', 'warning');
+              return false;
+            }
+            if (data.newPassword !== data.confirmPassword) {
+              await this.showToast('Las contraseñas no coinciden', 'warning');
+              return false;
+            }
+            try {
+              console.log('[CambioContraseña] Llamando a changePasswordFirstTime con userId:', userId, 'token:', token);
+              await this.authService.changePasswordFirstTime(userId, data.newPassword);
+              await this.showToast('Contraseña cambiada exitosamente');
+              // Actualizar el usuario en localStorage
+              const user = this.authService.getUser();
+              if (user) {
+                user.passwordChanged = true;
+                localStorage.setItem('user', JSON.stringify(user));
+              }
+              return true;
+            } catch (error: any) {
+              let message = 'Error al cambiar la contraseña';
+              if (error.error?.message) {
+                message = error.error.message;
+              }
+              console.error('[CambioContraseña] Error:', error);
+              await this.showToast(message + ' (Verifica que tu sesión esté activa e inténtalo de nuevo)', 'danger');
+              return false;
+            }
+          }
+        },
+        {
+          text: 'Cancelar',
+          role: 'cancel',
+          cssClass: 'alert-cancel-button secondary',
+          handler: () => {
+            this.authService.logout();
+            window.location.href = '/login';
+          }
+        }
+      ],
+      backdropDismiss: false
+    });
+    await alert.present();
+  }
+
+  async showToast(message: string, color: string = 'success') {
+    const toast = document.createElement('ion-toast');
+    toast.message = message;
+    toast.duration = 2000;
+    toast.color = color;
+    toast.position = 'top';
+    document.body.appendChild(toast);
+    await toast.present();
   }
 }
+
+

@@ -6,13 +6,13 @@
       <ion-card-title>Horario del Día</ion-card-title>
     </ion-card-header>
     <ion-card-content>
-      <ng-container *ngIf="horarioHoy; else sinHorario">
+      <ng-container *ngIf="horarioVigenteObj; else sinHorario">
         <p>
-          Hoy es: <strong>{{ diasToNombres(horarioHoy.dias) }}</strong> <br />
-          ⏰ Horario: <strong>{{ horarioHoy.horaInicio.slice(0,5) }} - {{ horarioHoy.horaFin.slice(0,5) }}</strong> <br />
-          🗓️ Vigencia: <strong>{{ horarioHoy.fechaInicio }} - {{ horarioHoy.fechaFin }}</strong>
+          Hoy es: <strong>{{ nombreDiaHoy }}</strong> <br />
+          ⏰ Horario: <strong>{{ horarioVigenteObj.horaInicio.slice(0,5) }} - {{ horarioVigenteObj.horaFin.slice(0,5) }}</strong> <br />
+          🗓️ Vigencia: <strong>{{ horarioVigenteObj.fechaInicio }} - {{ horarioVigenteObj.fechaFinRepeticion || horarioVigenteObj.fecha_fin_repeticion }}</strong>
         </p>
-        <p *ngIf="esHorarioVigente(); else proximoHorario">
+        <p *ngIf="horarioVigente; else proximoHorario">
           <ion-badge color="success">Horario vigente</ion-badge>
         </p>
         <ng-template #proximoHorario>
@@ -28,16 +28,18 @@
         {{ mostrarTodosHorarios ? 'Ocultar' : 'Mostrar' }} todos los horarios
       </ion-button>
 
-      <ion-list *ngIf="mostrarTodosHorarios && horariosRaw.length">
-        <ion-item *ngFor="let turno of horariosRaw">
-          <ion-label>
-            <strong>{{ turno.nombreTurno }}</strong><br>
-            🗓️ {{ diasToNombres(turno.dias) }}<br>
-            ⏰ {{ turno.horaInicio.slice(0,5) }} - {{ turno.horaFin.slice(0,5) }}<br>
-            📅 {{ turno.fechaInicio }} - {{ turno.fechaFin }}
-          </ion-label>
-        </ion-item>
-      </ion-list>
+      <div *ngIf="mostrarTodosHorarios && horariosRaw.length" style="max-height: 250px; overflow-y: auto; margin-top: 10px;">
+        <ion-list>
+          <ion-item *ngFor="let turno of horariosRaw">
+            <ion-label>
+              <strong>{{ turno.nombreTurno }}</strong><br>
+              🗓️ {{ diasToNombres(turno.dias) }}<br>
+              ⏰ {{ turno.horaInicio.slice(0,5) }} - {{ turno.horaFin.slice(0,5) }}<br>
+              📅 {{ turno.fechaInicio || turno.fecha_inicio }} - {{ turno.fechaFinRepeticion || turno.fecha_fin_repeticion || turno.fechaFin || turno.fecha_fin }}
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
       <p *ngIf="mostrarTodosHorarios && !horariosRaw.length" class="ion-text-center ion-padding">No tienes horarios asignados.</p>
     </ion-card-content>
   </ion-card>
@@ -53,7 +55,7 @@
         <p>Cargando mapa...</p>
       </div>
       <div id="map" style="height: 300px;"></div> <!-- Contenedor del mapa -->
-      <div *ngIf="!horarioHoy && mapInitialized" class="map-overlay">
+      <div *ngIf="!horarioVigenteObj && mapInitialized" class="map-overlay">
         <div class="overlay-content">
           <ion-icon name="lock-closed-outline" style="font-size: 2em;"></ion-icon>
           <p>Sin horario asignado hoy</p>

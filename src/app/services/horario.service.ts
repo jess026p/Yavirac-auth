@@ -1,20 +1,17 @@
-import { Injectable, Inject } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Storage } from '@ionic/storage-angular';
 import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class HorarioService {
-  constructor(private http: HttpClient, @Inject(Storage) private storage: Storage) {}
+  constructor(private http: HttpClient) {}
 
   async getUserLocations(userId: string) {
-    const token = await this.storage.get('token');
+    const token = localStorage.getItem('token');
     return this.http.get(`${environment.apiUrl}/horarios/user/${userId}/locations`, {
       headers: { Authorization: `Bearer ${token}` }
     }).toPromise();
   }
-
-
 } 
