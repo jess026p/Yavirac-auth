@@ -33,10 +33,10 @@ export class LoginUserPage implements OnInit {
   ) {}
 
   ngOnInit() {
-    // Verificar si hay una sesión activa
-    if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/home/inicio']);
-    }
+    // Eliminar la redirección automática si hay sesión activa
+    // if (this.authService.isAuthenticated()) {
+    //   this.router.navigate(['/home/inicio']);
+    // }
   }
 
   async showToast(message: string, color: string = 'success') {
@@ -75,7 +75,7 @@ export class LoginUserPage implements OnInit {
 
       const user = this.authService.getUser();
       await this.showToast(`¡Bienvenido, ${user?.name || this.username}!`);
-      this.router.navigate(['/home/inicio']);
+      window.location.href = '/home/inicio';
     } catch (error: any) {
       let message = 'Error al iniciar sesión';
       

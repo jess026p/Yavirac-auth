@@ -77,6 +77,8 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()">Verificar Asistencia</ion-button>
+  <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()" [disabled]="!puedeMarcarAsistencia">
+    {{ puedeMarcarAsistencia ? 'Verificar Asistencia' : 'Asistencia completada' }}
+  </ion-button>
 
 </ion-content>
