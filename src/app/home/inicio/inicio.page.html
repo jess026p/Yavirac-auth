@@ -12,12 +12,17 @@
           ⏰ Horario: <strong>{{ horarioVigenteObj.horaInicio.slice(0,5) }} - {{ horarioVigenteObj.horaFin.slice(0,5) }}</strong> <br />
           🗓️ Vigencia: <strong>{{ horarioVigenteObj.fechaInicio }} - {{ horarioVigenteObj.fechaFinRepeticion || horarioVigenteObj.fecha_fin_repeticion }}</strong>
         </p>
-        <p *ngIf="horarioVigente; else proximoHorario">
-          <ion-badge color="success">Horario vigente</ion-badge>
+        <p *ngIf="badgeHorario">
+          <ion-badge 
+            [color]="
+              badgeHorario === 'Horario vigente' ? 'success' : 
+              (badgeHorario === 'No marcaste entrada' ? 'danger' : 
+              (badgeHorario === 'Próximo horario' ? 'warning' : 
+              (badgeHorario === 'Pendiente de salida' ? 'warning' : 'medium')))
+            ">
+            {{ badgeHorario }}
+          </ion-badge>
         </p>
-        <ng-template #proximoHorario>
-          <ion-badge color="warning">Próximo horario (aún no inicia)</ion-badge>
-        </ng-template>
       </ng-container>
       <ng-template #sinHorario>
         <p class="ion-text-center ion-padding">
@@ -78,7 +83,7 @@
   </ion-card>
 
   <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()" [disabled]="!puedeMarcarAsistencia">
-    {{ puedeMarcarAsistencia ? 'Verificar Asistencia' : 'Asistencia completada' }}
+    {{ puedeMarcarAsistencia ? 'Verificar Asistencia' : (badgeHorario === 'No marcaste entrada' ? 'No marcaste entrada' : 'Asistencia completada') }}
   </ion-button>
 
 </ion-content>

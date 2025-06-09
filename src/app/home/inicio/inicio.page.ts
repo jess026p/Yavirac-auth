@@ -71,6 +71,7 @@ export class InicioPage implements AfterViewInit {
   horarioVigenteObj: any = null;
   horariosPendientes: any[] = [];
   public puedeMarcarAsistencia: boolean = true;
+  public badgeHorario: string = '';
 
 constructor(
   private horarioService: HorarioService,
@@ -129,7 +130,13 @@ constructor(
     if (!user || !user.id) return;
     const response: any = await this.horarioService.getUserLocations(user.id);
     const data = response.data || [];
-    console.log('Horarios recibidos:', data); // LOG DE DEPURACIÓN
+    // Forzar que los campos de tolerancia sean numéricos y tengan valor por defecto
+    data.forEach((turno: any) => {
+      turno.toleranciaInicioAntes = Number(turno.toleranciaInicioAntes ?? turno.tolerancia_inicio_antes ?? 0);
+      turno.toleranciaInicioDespues = Number(turno.toleranciaInicioDespues ?? turno.tolerancia_inicio_despues ?? 0);
+      turno.atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
+    });
+    console.log('Horarios recibidos (con tolerancias):', data); // LOG DE DEPURACIÓN
     this.horariosRaw = data;
     this.horarios = data.map((turno: any) => ({
       nombre: turno.nombreTurno,
@@ -150,6 +157,14 @@ constructor(
     const hoyFecha = getFechaLocal();
     this.nombreDiaHoy = hoyNombre;
     this.fechaHoy = hoyJS.toLocaleDateString('es-EC');
+    // Obtener asistencias del usuario para hoy
+    const user = this.authService.getUser();
+    let asistArray: any[] = [];
+    if (user && user.id) {
+      const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
+      asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+      console.log('Asistencias del día:', asistArray);
+    }
     // Incluir todos los horarios válidos para hoy (por día y fecha)
     this.horariosDelDia = this.horariosRaw.filter((turno: any) => {
       const fechaInicio = turno.fechaInicio || turno.fecha_inicio;
@@ -163,6 +178,19 @@ constructor(
         diasArr = turno.dias.split(',').map((d: string) => d.toLowerCase().trim());
       }
       // Solo el día de hoy
+      // FILTRO: Si ya marcó salida para este horario, no lo muestres
+      const yaSalida = asistArray.find((a: any) =>
+        String(a.horarioId) === String(turno.id) &&
+        (
+          a.estado === 'salida' ||
+          a.estado_salida === 'salida' ||
+          (a.estado === 'fuera_de_zona' && a.hora_salida)
+        )
+      );
+      if (yaSalida) {
+        console.log('Horario filtrado por salida:', turno.id, yaSalida);
+        return false;
+      }
       return diasArr.includes(hoyNombre.toLowerCase());
     });
     // Eliminar duplicados por id (por si el admin actualiza un horario)
@@ -172,6 +200,11 @@ constructor(
     this.estadoHorarios = {};
     this.horarioVigenteObj = null;
     let horarioPendienteSalida = null;
+    let horarioEntradaVigente = null;
+    let horarioNoMarcasteEntrada = null;
+    let horaFinNoMarcaste = null;
+    let horarioEntradaSinSalida = null;
+    let horarioSoloVigente = null;
     for (let i = 0; i < this.horariosDelDia.length; i++) {
       const turno = this.horariosDelDia[i];
       const siguiente = this.horariosDelDia[i+1] || null;
@@ -188,10 +221,40 @@ constructor(
       if (!horarioPendienteSalida && estado.accion === 'salida' && estado.puedeMarcar) {
         horarioPendienteSalida = turno;
       }
+      // Si el estado es 'No marcaste entrada', guardar para mostrarlo hasta la hora de salida
+      if (!horarioNoMarcasteEntrada && estado.badge === 'No marcaste entrada') {
+        horarioNoMarcasteEntrada = turno;
+        horaFinNoMarcaste = crearFechaEcuador(hoyFecha, horaFinStr);
+      }
+      // Si el estado es 'entrada', guardar para mostrarlo como vigente
+      if (!horarioEntradaVigente && estado.accion === 'entrada' && estado.puedeMarcar) {
+        horarioEntradaVigente = turno;
+      }
+      // Si ya marcó entrada y no salida, guardar para mostrarlo como vigente
+      if (!horarioEntradaSinSalida && estado.accion === '' && estado.badge === '' && estado.vigente && !estado.puedeMarcar) {
+        const user = this.authService.getUser();
+        const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
+        const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+        const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'entrada' || a.estado === 'atraso' || a.estado === 'fuera_de_zona'));
+        const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'salida' || (a.estado === 'fuera_de_zona' && a.hora_salida)));
+        if (yaEntrada && !yaSalida) {
+          horarioEntradaSinSalida = turno;
+        }
+      }
+      // Si el estado es vigente (aunque no tenga acción ni badge), guardar para mostrarlo
+      if (!horarioSoloVigente && estado.vigente) {
+        horarioSoloVigente = turno;
+      }
     }
     // Si hay horario pendiente de salida, ese es el vigente
     if (horarioPendienteSalida) {
       this.horarioVigenteObj = horarioPendienteSalida;
+    } else if (horarioEntradaSinSalida) {
+      this.horarioVigenteObj = horarioEntradaSinSalida;
+    } else if (horarioEntradaVigente) {
+      this.horarioVigenteObj = horarioEntradaVigente;
+    } else if (horarioSoloVigente) {
+      this.horarioVigenteObj = horarioSoloVigente;
     } else {
       // Si no, buscar el próximo horario (badge 'Próximo horario')
       for (let i = 0; i < this.horariosDelDia.length; i++) {
@@ -202,9 +265,19 @@ constructor(
           break;
         }
       }
+      // Si no hay próximo horario, pero hay uno con 'No marcaste entrada' y aún no es la hora de salida, mostrarlo
+      if (!this.horarioVigenteObj && horarioNoMarcasteEntrada && horaFinNoMarcaste) {
+        const ahora = new Date();
+        if (ahora <= horaFinNoMarcaste) {
+          this.horarioVigenteObj = horarioNoMarcasteEntrada;
+        }
+      }
     }
     if (this.horarioVigenteObj) {
       this.horarioHoy = this.horarioVigenteObj;
+      const estado = this.estadoHorarios[this.horarioVigenteObj.id];
+      this.badgeHorario = estado?.badge || '';
+      this.puedeMarcarAsistencia = (estado?.puedeMarcar || false) && this.badgeHorario !== 'No marcaste entrada';
       const lat = this.horarioVigenteObj.ubicacionLat || this.horarioVigenteObj.lat;
       const lng = this.horarioVigenteObj.ubicacionLng || this.horarioVigenteObj.lng;
       if (lat && lng) {
@@ -215,6 +288,8 @@ constructor(
     } else {
       this.horarioHoy = null;
       this.userLocations = [];
+      this.badgeHorario = '';
+      this.puedeMarcarAsistencia = false;
     }
     this.addUserLocationsMarkers();
     this.horarioVigente = await this.esHorarioVigente();
@@ -407,23 +482,23 @@ constructor(
       asistencias = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
       asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
       if (tipo === 'entrada') {
-        if (fueraDeZona) {
-          await this.showAlert('Entrada fuera de zona', respuesta.motivo || 'Entrada registrada fuera de la zona permitida.');
-        } else {
-          await this.showAlert('Entrada registrada', respuesta.motivo || 'Entrada registrada correctamente.');
-        }
+        await this.showAlert('Entrada registrada', respuesta.motivo || 'Entrada registrada correctamente.');
+        await this.loadUserHorariosYUbicacion();
       } else if (tipo === 'salida') {
-        if (fueraDeZona) {
-          await this.showAlert('Salida fuera de zona', respuesta.motivo || 'Salida registrada fuera de la zona permitida.');
-        } else {
-          await this.showAlert('Salida registrada', respuesta.motivo || 'Salida registrada correctamente.');
-        }
+        await this.showAlert('Salida registrada', respuesta.motivo || 'Salida registrada correctamente.');
+        await this.loadUserHorariosYUbicacion();
       }
       await this.actualizarEstadoBotonAsistencia();
       this.horarioVigente = await this.esHorarioVigente();
       this.cdr.detectChanges();
-    } catch (error) {
-      await this.showAlert('Error', '❌ Error al registrar la asistencia.');
+    } catch (error: any) {
+      let message = 'Error al registrar la asistencia.';
+      if (error.error?.message) {
+        message = error.error.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+      await this.showAlert('Error', message);
     }
   }
 
@@ -603,34 +678,35 @@ constructor(
     const horaInicio = crearFechaEcuador(hoyFecha, horaInicioStr);
     const horaFin = crearFechaEcuador(hoyFecha, horaFinStr);
     const ahora = new Date();
+    // Usar tolerancias desde la base de datos
     const toleranciaAntes = Number(turno.toleranciaInicioAntes ?? turno.tolerancia_inicio_antes ?? 0);
     const toleranciaDespues = Number(turno.toleranciaInicioDespues ?? turno.tolerancia_inicio_despues ?? 0);
     const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
     const mostrarAntes = new Date(horaInicio.getTime() - 10 * 60000);
     const inicioRango = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
     const finAtraso = new Date(horaInicio.getTime() + toleranciaDespues * 60000 + atrasoPermitido * 60000);
-
     const user = this.authService.getUser();
     if (!user || !user.id) return {accion: '', badge: 'Sin usuario', puedeMarcar: false, vigente: false};
     const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
     const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
     const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'entrada' || a.estado === 'atraso' || a.estado === 'fuera_de_zona'));
-    const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'salida' || (a.estado === 'fuera_de_zona' && a.hora_salida)));
+    const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'salida' || a.estado_salida === 'salida' || (a.estado === 'fuera_de_zona' && a.hora_salida)));
 
-    // Si está entre 10 minutos antes y 5 minutos antes del inicio
+    // Si está entre 10 minutos antes y el inicio del rango de entrada
     if (!yaEntrada && ahora >= mostrarAntes && ahora < inicioRango) {
       return {accion: '', badge: 'Próximo horario', puedeMarcar: false, vigente: false};
     }
-    // Si está dentro de los 5 minutos antes del inicio (tolerancia inicio antes)
-    if (!yaEntrada && ahora >= inicioRango && ahora < horaInicio) {
-      return {accion: 'entrada', badge: '', puedeMarcar: true, vigente: true};
-    }
-    // Entrada: solo dentro de tolerancias (tolerancia inicio antes y después)
+    // Si está dentro del rango de entrada (tolerancia antes y después)
     if (!yaEntrada && ahora >= inicioRango && ahora <= finAtraso) {
-      return {accion: 'entrada', badge: '', puedeMarcar: true, vigente: true};
+      return {accion: 'entrada', badge: 'Horario vigente', puedeMarcar: true, vigente: true};
     }
-    // Salida: después de horaFin, sin restricción de tiempo, pero con límites
+    // Si ya pasó el rango de entrada y no marcó
+    if (!yaEntrada && ahora > finAtraso) {
+      return {accion: '', badge: 'No marcaste entrada', puedeMarcar: false, vigente: true};
+    }
+    // Salida: solo si ya marcó entrada y no salida, y es después de la hora de salida
     if (yaEntrada && !yaSalida && ahora >= horaFin) {
+      // Si hay siguiente horario, el vigente desaparece 15 minutos antes del próximo
       if (siguienteHorario) {
         const siguienteHoraInicioStr = siguienteHorario.horaInicio.length > 5 ? siguienteHorario.horaInicio.slice(0,5) : siguienteHorario.horaInicio;
         const siguienteHoraInicio = crearFechaEcuador(hoyFecha, siguienteHoraInicioStr);
@@ -642,31 +718,34 @@ constructor(
           return {accion: 'salida', badge: 'Pendiente de salida', puedeMarcar: true, vigente: true};
         }
       }
-      const limiteMaximoSalida = new Date(`${hoyFecha}T23:55:00-05:00`);
+      // Si es horario nocturno, solo se puede marcar hasta las 23:59
+      const limiteMaximoSalida = new Date(`${hoyFecha}T23:59:00-05:00`);
       if (!siguienteHorario && ahora > limiteMaximoSalida) {
         return {accion: '', badge: 'Límite del día alcanzado', puedeMarcar: false, vigente: false};
       }
       return {accion: 'salida', badge: 'Pendiente de salida', puedeMarcar: true, vigente: true};
     }
+    // Si ya marcó entrada y no salida, pero aún no es hora de salida, mantener el horario vigente pero sin permitir marcar salida
+    if (yaEntrada && !yaSalida && ahora < horaFin) {
+      return {accion: '', badge: 'Horario vigente', puedeMarcar: false, vigente: true};
+    }
     // Si ya marcó ambos
     if (yaEntrada && yaSalida) {
       return {accion: '', badge: 'Completado', puedeMarcar: false, vigente: false};
     }
-    // Si está fuera de rango de entrada
+    // Si está fuera de rango de entrada pero antes del inicio
     if (!yaEntrada && ahora < inicioRango) {
       return {accion: '', badge: 'Próximo horario', puedeMarcar: false, vigente: false};
     }
-    if (!yaEntrada && ahora > finAtraso) {
-      return {accion: '', badge: 'No marcaste entrada', puedeMarcar: false, vigente: false};
-    }
+    // Por defecto, fuera de horario
     return {accion: '', badge: 'Fuera de horario', puedeMarcar: false, vigente: false};
   }
 
   async checkPasswordChange() {
     const token = localStorage.getItem('token');
     const user = this.authService.getUser();
-    console.log('[CambioContraseña] Token:', token);
-    console.log('[CambioContraseña] User:', user);
+    //console.log('[CambioContraseña] Token:', token);
+    //console.log('[CambioContraseña] User:', user);
     if (!token || !user || !user.id) {
       console.warn('[CambioContraseña] No hay token o usuario válido. Cerrando sesión.');
       this.authService.logout();
