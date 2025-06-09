@@ -18,7 +18,9 @@ import { HorarioService } from '../../services/horario.service';
 import { AuthService } from '../../services/auth.service';
 import { take } from 'rxjs/operators';
 import { AsistenciaService } from '../../services/asistencia.service';
-import { AlertController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
+import { environment } from '../../../environments/environment';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 function getFechaLocal(): string {
   const hoy = new Date();
@@ -75,7 +77,9 @@ constructor(
   private authService: AuthService,
   private asistenciaService: AsistenciaService, // ✅ agregado correctamente
   private cdr: ChangeDetectorRef,
-  private alertCtrl: AlertController
+  private alertCtrl: AlertController,
+  private http: HttpClient, // <-- Agregado para peticiones HTTP
+  private toastCtrl: ToastController // <-- Agregado para toasts
 ) {}
 
   async ngAfterViewInit() {
@@ -523,10 +527,17 @@ constructor(
 
   async getDireccion(lat: number, lng: number) {
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const data = await response.json();
-      this.direccionActual = data.display_name || 'No disponible';
+      const token = localStorage.getItem('token');
+      const headers = new HttpHeaders({
+        Authorization: `Bearer ${token}`
+      });
+      const url = `${environment.apiUrl}/geocoding/reverse?lat=${lat}&lon=${lng}`;
+      console.log('URL de la petición:', url);
+      const data: any = await this.http.get(url, { headers }).toPromise();
+      console.log('Respuesta del backend (geocoding):', data);
+      this.direccionActual = data.data?.display_name || 'No disponible';
     } catch (error) {
+      console.error('Error al obtener la dirección:', error);
       this.direccionActual = 'No disponible';
     }
   }
@@ -761,12 +772,12 @@ constructor(
   }
 
   async showToast(message: string, color: string = 'success') {
-    const toast = document.createElement('ion-toast');
-    toast.message = message;
-    toast.duration = 2000;
-    toast.color = color;
-    toast.position = 'top';
-    document.body.appendChild(toast);
+    const toast = await this.toastCtrl.create({
+      message,
+      duration: 2000,
+      color,
+      position: 'top'
+    });
     await toast.present();
   }
 

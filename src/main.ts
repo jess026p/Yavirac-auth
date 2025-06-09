@@ -2,7 +2,7 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { AuthInterceptor } from './app/services/auth.interceptor';
+import { authInterceptorProvider } from './app/services/auth.interceptor';
 import { importProvidersFrom } from '@angular/core';
 import { IonicStorageModule } from '@ionic/storage-angular';
 
@@ -17,7 +17,7 @@ bootstrapApplication(AppComponent, {
     provideHttpClient(
       withInterceptorsFromDi()
     ),
-    AuthInterceptor,
+    authInterceptorProvider,
     importProvidersFrom(IonicStorageModule.forRoot()),
   ],
 });
