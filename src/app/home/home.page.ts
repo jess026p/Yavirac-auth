@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonContent, IonTabBar, IonTabButton, IonIcon, IonLabel, IonTabs, IonRouterOutlet, IonHeader, IonToolbar, IonAvatar, IonButton } from '@ionic/angular/standalone';
-import { homeOutline, personOutline, notificationsOutline, settingsOutline, personCircleOutline, logOutOutline } from 'ionicons/icons';
+import { homeOutline, personOutline, notificationsOutline, settingsOutline, personCircleOutline, logOutOutline, checkmarkCircle, closeCircle, warning, informationCircle } from 'ionicons/icons';
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 import { RouterLink, RouterLinkActive } from '@angular/router';
@@ -23,7 +23,15 @@ export class HomePage implements OnInit {
   user: any = null;
 
   constructor(private authService: AuthService, private router: Router) {
-      addIcons({personCircleOutline,logOutOutline});}
+      addIcons({
+        personCircleOutline,
+        logOutOutline,
+        checkmarkCircle,
+        closeCircle,
+        warning,
+        informationCircle
+      });
+  }
 
   ngOnInit() {
     this.user = this.authService.getUser();

@@ -153,7 +153,6 @@ constructor(
     const hoy = hoyJS.getDay();
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const hoyNombre = diasSemana[hoy];
-    const hoyNum = hoy === 0 ? 7 : hoy; // domingo=7
     const hoyFecha = getFechaLocal();
     this.nombreDiaHoy = hoyNombre;
     this.fechaHoy = hoyJS.toLocaleDateString('es-EC');
@@ -177,20 +176,6 @@ constructor(
       } else if (typeof turno.dias === 'string') {
         diasArr = turno.dias.split(',').map((d: string) => d.toLowerCase().trim());
       }
-      // Solo el día de hoy
-      // FILTRO: Si ya marcó salida para este horario, no lo muestres
-      const yaSalida = asistArray.find((a: any) =>
-        String(a.horarioId) === String(turno.id) &&
-        (
-          a.estado === 'salida' ||
-          a.estado_salida === 'salida' ||
-          (a.estado === 'fuera_de_zona' && a.hora_salida)
-        )
-      );
-      if (yaSalida) {
-        console.log('Horario filtrado por salida:', turno.id, yaSalida);
-        return false;
-      }
       return diasArr.includes(hoyNombre.toLowerCase());
     });
     // Eliminar duplicados por id (por si el admin actualiza un horario)
@@ -200,53 +185,62 @@ constructor(
     this.estadoHorarios = {};
     this.horarioVigenteObj = null;
     let horarioPendienteSalida = null;
+    let horarioEntradaSinSalida = null;
     let horarioEntradaVigente = null;
+    let horarioSoloVigente = null;
     let horarioNoMarcasteEntrada = null;
     let horaFinNoMarcaste = null;
-    let horarioEntradaSinSalida = null;
-    let horarioSoloVigente = null;
+    let margenGraciaMin = 0;
+    // NUEVO: Buscar primero el turno donde ya marcaste entrada y aún no salida
     for (let i = 0; i < this.horariosDelDia.length; i++) {
       const turno = this.horariosDelDia[i];
       const siguiente = this.horariosDelDia[i+1] || null;
-      const horaInicioStr = turno.horaInicio.length > 5 ? turno.horaInicio.slice(0,5) : turno.horaInicio;
-      const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
-      const horaInicioNum = parseInt(horaInicioStr.split(':')[0], 10);
-      const horaActualNum = hoyJS.getHours();
-      if (horaInicioNum < 6 && horaActualNum >= 6) {
-        continue; // saltar este turno
-      }
       const estado = await this.getEstadoHorario(turno, siguiente);
       this.estadoHorarios[turno.id] = estado;
-      // Prioridad: horario con salida pendiente
+      // 1. Salida pendiente
       if (!horarioPendienteSalida && estado.accion === 'salida' && estado.puedeMarcar) {
         horarioPendienteSalida = turno;
       }
-      // Si el estado es 'No marcaste entrada', guardar para mostrarlo hasta la hora de salida
-      if (!horarioNoMarcasteEntrada && estado.badge === 'No marcaste entrada') {
-        horarioNoMarcasteEntrada = turno;
-        horaFinNoMarcaste = crearFechaEcuador(hoyFecha, horaFinStr);
-      }
-      // Si el estado es 'entrada', guardar para mostrarlo como vigente
-      if (!horarioEntradaVigente && estado.accion === 'entrada' && estado.puedeMarcar) {
-        horarioEntradaVigente = turno;
-      }
-      // Si ya marcó entrada y no salida, guardar para mostrarlo como vigente
-      if (!horarioEntradaSinSalida && estado.accion === '' && estado.badge === '' && estado.vigente && !estado.puedeMarcar) {
-        const user = this.authService.getUser();
-        const asistencias: any = await this.asistenciaService.obtenerAsistenciaPorFecha(user.id, hoyFecha);
-        const asistArray = asistencias && Array.isArray(asistencias.data) ? asistencias.data : [];
+      // 2. Entrada sin salida (ya marcó entrada, no salida, aunque no pueda marcar salida aún)
+      if (!horarioEntradaSinSalida && estado.vigente && !estado.puedeMarcar && estado.accion === '' && estado.badge === 'Horario vigente') {
+        // Confirmar que ya marcó entrada y no salida
         const yaEntrada = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'entrada' || a.estado === 'atraso' || a.estado === 'fuera_de_zona'));
         const yaSalida = asistArray.find((a: any) => String(a.horarioId) === String(turno.id) && (a.estado === 'salida' || (a.estado === 'fuera_de_zona' && a.hora_salida)));
         if (yaEntrada && !yaSalida) {
           horarioEntradaSinSalida = turno;
         }
       }
-      // Si el estado es vigente (aunque no tenga acción ni badge), guardar para mostrarlo
+      // 3. Entrada vigente
+      if (!horarioEntradaVigente && estado.accion === 'entrada' && estado.puedeMarcar) {
+        horarioEntradaVigente = turno;
+      }
+      // 4. Solo vigente
       if (!horarioSoloVigente && estado.vigente) {
         horarioSoloVigente = turno;
       }
+      // 6. No marcaste entrada (solo si el turno sigue vigente)
+      if (!horarioNoMarcasteEntrada && estado.badge === 'No marcaste entrada') {
+        // Calcular margen de gracia (puedes ajustar este valor si tienes una tolerancia de salida)
+        const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
+        const toleranciaFinDespues = Number(turno.toleranciaFinDespues ?? turno.tolerancia_fin_despues ?? 0);
+        const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
+        // Si es el último turno del día, margen máximo hasta las 23:59
+        const esUltimoTurno = (i === this.horariosDelDia.length - 1);
+        let horaLimite;
+        if (esUltimoTurno) {
+          horaLimite = new Date(`${hoyFecha}T23:59:00-05:00`);
+        } else {
+          horaLimite = crearFechaEcuador(hoyFecha, horaFinStr);
+          horaLimite = new Date(horaLimite.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+        }
+        const ahora = new Date();
+        if (ahora <= horaLimite) {
+          horarioNoMarcasteEntrada = turno;
+          horaFinNoMarcaste = horaLimite;
+        }
+      }
     }
-    // Si hay horario pendiente de salida, ese es el vigente
+    // Prioridad de selección
     if (horarioPendienteSalida) {
       this.horarioVigenteObj = horarioPendienteSalida;
     } else if (horarioEntradaSinSalida) {
@@ -256,7 +250,7 @@ constructor(
     } else if (horarioSoloVigente) {
       this.horarioVigenteObj = horarioSoloVigente;
     } else {
-      // Si no, buscar el próximo horario (badge 'Próximo horario')
+      // 5. Próximo horario
       for (let i = 0; i < this.horariosDelDia.length; i++) {
         const turno = this.horariosDelDia[i];
         const estado = this.estadoHorarios[turno.id];
@@ -265,7 +259,7 @@ constructor(
           break;
         }
       }
-      // Si no hay próximo horario, pero hay uno con 'No marcaste entrada' y aún no es la hora de salida, mostrarlo
+      // 6. No marcaste entrada (si aún no termina el turno)
       if (!this.horarioVigenteObj && horarioNoMarcasteEntrada && horaFinNoMarcaste) {
         const ahora = new Date();
         if (ahora <= horaFinNoMarcaste) {

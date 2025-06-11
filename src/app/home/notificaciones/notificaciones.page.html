@@ -5,10 +5,19 @@
     </ion-card-header>
     <ion-card-content>
       <ion-list>
-        <ion-item *ngFor="let notificacion of notificaciones">
+        <ion-item *ngIf="loading">
+          <ion-spinner name="crescent"></ion-spinner>
+          <ion-label>Cargando notificaciones...</ion-label>
+        </ion-item>
+        <ion-item *ngFor="let n of notificaciones" lines="none" class="noti-item">
+          <ion-icon [name]="getIcono(n.tipo)" slot="start" [color]="getColor(n.tipo)" class="noti-icon"></ion-icon>
           <ion-label>
-            <p>{{ notificacion.fecha }} - {{ notificacion.mensaje }}</p>
+            <div class="noti-fecha"><strong>{{ n.fecha }} {{ n.hora }}</strong></div>
+            <div>{{ n.mensaje }}</div>
           </ion-label>
+        </ion-item>
+        <ion-item *ngIf="!loading && notificaciones.length === 0">
+          <ion-label>No hay notificaciones.</ion-label>
         </ion-item>
       </ion-list>
     </ion-card-content>

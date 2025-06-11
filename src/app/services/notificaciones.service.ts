@@ -7,6 +7,6 @@ export class NotificacionesService {
   constructor(private http: HttpClient) {}
 
   obtenerNotificaciones(userId: string) {
-    return this.http.get<any[]>(`${environment.apiUrl}/notificaciones/user/${userId}`);
+    return this.http.get<any>(`${environment.apiUrl}/notificaciones/user/${userId}`);
   }
 } 

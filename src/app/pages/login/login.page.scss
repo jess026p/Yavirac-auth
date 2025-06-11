@@ -33,7 +33,7 @@ ion-content {
   display: block;
   margin: 0 auto 12px auto;
   width: 90%;
-  max-width: 240px;
+  max-width: 340px;
 }
 
 /* 🔹 Tarjeta con fondo semitransparente */
@@ -142,14 +142,16 @@ ion-card-subtitle {
 /* 🔹 Responsividad */
 @media (max-width: 768px) {
   .logo {
-    width: 95vw;
+    width: 95%;
     max-width: 310px;
   }
 
   ion-card {
     width: 95%;
     padding: 40px 6vw;
-    margin: 15vh auto; /* Agrega margen superior en pantallas pequeñas */
+    margin: 15vh auto; 
+    height: 60vh;
+    justify-content: center;/* Agrega margen superior en pantallas pequeñas */
   }
 
   ion-card-title {
@@ -169,13 +171,13 @@ ion-card-subtitle {
 
 @media (max-width: 480px) {
   .logo {
-    width: 85%;
-    max-width: 180px;
+    width: 95%;
+    max-width: 280px;
     margin-bottom: 10px;
   }
 
   ion-card {
-    min-height: 50vh;
+    min-height: 70vh;
     max-height: 90vh;
   }
 }

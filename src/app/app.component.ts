@@ -9,7 +9,12 @@ import {
   fingerPrintOutline,
   idCardOutline,
   personCircleOutline,
-  logOutOutline
+  logOutOutline,
+  checkmarkCircle,
+  closeCircle,
+  warning,
+  informationCircle,
+  notifications
 } from 'ionicons/icons';
 
 @Component({
@@ -31,7 +36,12 @@ export class AppComponent {
       'finger-print-outline': fingerPrintOutline,
       'id-card-outline': idCardOutline,
       'person-circle-outline': personCircleOutline,
-      'log-out-outline': logOutOutline
+      'log-out-outline': logOutOutline,
+      'checkmark-circle': checkmarkCircle,
+      'close-circle': closeCircle,
+      'warning': warning,
+      'information-circle': informationCircle,
+      'notifications': notifications
     });
   }
 }

@@ -2,7 +2,7 @@
 // ... existing code ... 
 
 ion-content {
-  --background: linear-gradient(135deg, #FF8000, #0055FF);
+  --background: linear-gradient(135deg, #FF8000, #0053f8);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -55,7 +55,7 @@ ion-card-subtitle {
 }
 
 .loginbtn {
-  --ion-color-primary: #0258ff;
+  --ion-color-primary: #000000;
 }
 
 ion-button {
@@ -120,6 +120,6 @@ ion-input {
 }
 
 ion-label {
-  color: #222;
+  color: #0b0a0a;
   font-weight: 500;
 } 
