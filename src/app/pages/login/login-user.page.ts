@@ -29,6 +29,8 @@ export class LoginUserPage implements OnInit {
   loading: boolean = false;
   rememberMe: boolean = false;
   acceptTerms: boolean = false;
+  biometricAvailable: boolean = false;
+  biometricAuthEnabled: boolean = true;
 
   termsHtml: string = `
     <strong>INSTITUTO SUPERIOR TECNOLÓGICO DE TURISMO Y PATRIMONIO YAVIRAC</strong><br>
@@ -66,11 +68,15 @@ export class LoginUserPage implements OnInit {
     private http: HttpClient
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     // Eliminar la redirección automática si hay sesión activa
     // if (this.authService.isAuthenticated()) {
     //   this.router.navigate(['/home/inicio']);
     // }
+    const creds = await Preferences.get({ key: 'biometricUser' });
+    this.biometricAvailable = !!creds.value;
+    const bioAuth = await Preferences.get({ key: 'biometricAuth' });
+    this.biometricAuthEnabled = bioAuth.value === null ? true : bioAuth.value === 'true';
   }
 
   async showToast(message: string, color: string = 'success') {
@@ -124,6 +130,10 @@ export class LoginUserPage implements OnInit {
       }
       // Guardar credenciales para login biométrico
       await Preferences.set({ key: 'biometricUser', value: JSON.stringify({ username: this.username, password: this.password }) });
+      this.biometricAvailable = true;
+      // Asegura que si la biometría estaba desactivada y el usuario inicia sesión, se respete la preferencia
+      const bioAuth = await Preferences.get({ key: 'biometricAuth' });
+      this.biometricAuthEnabled = bioAuth.value === null ? true : bioAuth.value === 'true';
       await this.showToast(`¡Bienvenido, ${user?.name || this.username}!`);
       window.location.href = '/home/inicio';
     } catch (error: any) {

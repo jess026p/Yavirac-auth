@@ -21,6 +21,7 @@ import { AsistenciaService } from '../../services/asistencia.service';
 import { AlertController, ToastController } from '@ionic/angular';
 import { environment } from '../../../environments/environment';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Preferences } from '@capacitor/preferences';
 
 function getFechaLocal(): string {
   const hoy = new Date();
@@ -72,6 +73,7 @@ export class InicioPage implements AfterViewInit {
   horariosPendientes: any[] = [];
   public puedeMarcarAsistencia: boolean = true;
   public badgeHorario: string = '';
+  public locationAuthEnabled: boolean = true;
 
 constructor(
   private horarioService: HorarioService,
@@ -92,9 +94,18 @@ constructor(
     // Inicializa el mapa lo antes posible
     await this.loadMap();
     // Carga horarios y ubicación en paralelo
-    this.loadUserHorariosYUbicacion();
+    await this.loadUserHorariosYUbicacion();
     this.getActualLocation();
     await this.checkPasswordChange();
+    // Actualizar horarios y estado cada minuto
+    setInterval(() => {
+      this.setHorarioHoyYUbicacion();
+    }, 60000);
+  }
+
+  async ionViewWillEnter() {
+    const geoAuth = await Preferences.get({ key: 'locationEnabled' });
+    this.locationAuthEnabled = geoAuth.value === null ? true : geoAuth.value === 'true';
   }
 
   // Convierte un número de día (1-7) a nombre de día
@@ -190,7 +201,6 @@ constructor(
     let horarioSoloVigente = null;
     let horarioNoMarcasteEntrada = null;
     let horaFinNoMarcaste = null;
-    let margenGraciaMin = 0;
     // NUEVO: Buscar primero el turno donde ya marcaste entrada y aún no salida
     for (let i = 0; i < this.horariosDelDia.length; i++) {
       const turno = this.horariosDelDia[i];
@@ -220,20 +230,16 @@ constructor(
       }
       // 6. No marcaste entrada (solo si el turno sigue vigente)
       if (!horarioNoMarcasteEntrada && estado.badge === 'No marcaste entrada') {
-        // Calcular margen de gracia (puedes ajustar este valor si tienes una tolerancia de salida)
         const horaFinStr = turno.horaFin.length > 5 ? turno.horaFin.slice(0,5) : turno.horaFin;
-        const toleranciaFinDespues = Number(turno.toleranciaFinDespues ?? turno.tolerancia_fin_despues ?? 0);
-        const atrasoPermitido = Number(turno.atrasoPermitido ?? turno.atraso_permitido ?? 0);
-        // Si es el último turno del día, margen máximo hasta las 23:59
-        const esUltimoTurno = (i === this.horariosDelDia.length - 1);
-        let horaLimite;
-        if (esUltimoTurno) {
-          horaLimite = new Date(`${hoyFecha}T23:59:00-05:00`);
-        } else {
-          horaLimite = crearFechaEcuador(hoyFecha, horaFinStr);
-          horaLimite = new Date(horaLimite.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
-        }
+        let horaLimite = crearFechaEcuador(hoyFecha, horaFinStr);
         const ahora = new Date();
+        console.log('Depuración No marcaste entrada:', {
+          ahora,
+          horaFin: horaFinStr,
+          horaLimite,
+          turnoId: turno.id,
+          nombre: turno.nombreTurno
+        });
         if (ahora <= horaLimite) {
           horarioNoMarcasteEntrada = turno;
           horaFinNoMarcaste = horaLimite;
@@ -264,6 +270,8 @@ constructor(
         const ahora = new Date();
         if (ahora <= horaFinNoMarcaste) {
           this.horarioVigenteObj = horarioNoMarcasteEntrada;
+        } else {
+          this.horarioVigenteObj = null;
         }
       }
     }
@@ -516,7 +524,7 @@ constructor(
     ahora.setSeconds(0, 0);
 
     const inicioRango = new Date(horaInicio.getTime() - toleranciaAntes * 60000);
-    const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+    const finRango = new Date(horaFin.getTime() + atrasoPermitido * 60000);
 
     // Para puntualidad y atraso
     const finPuntual = new Date(horaInicio.getTime() + toleranciaDespues * 60000);
@@ -524,7 +532,7 @@ constructor(
 
     // Para salida
     const inicioSalida = horaFin;
-    const finSalida = new Date(horaFin.getTime() + toleranciaFinDespues * 60000);
+    const finSalida = horaFin;
 
     // Verificar si está dentro de la zona
     const distancia = this.calculateDistance(
@@ -651,7 +659,7 @@ constructor(
     const horaInicio = crearFechaEcuador(hoyFecha, horaInicioStr);
     const horaFin = crearFechaEcuador(hoyFecha, horaFinStr);
     const inicioRango = new Date(horaInicio.getTime() - toleranciaInicioAntes * 60000);
-    const finRango = new Date(horaFin.getTime() + (toleranciaFinDespues + atrasoPermitido) * 60000);
+    const finRango = new Date(horaFin.getTime() + atrasoPermitido * 60000);
     // NUEVO: Si ya marcó entrada y no salida, sigue siendo vigente
     const user = this.authService.getUser();
     if (!user || !user.id) return false;
@@ -695,28 +703,12 @@ constructor(
       return {accion: 'entrada', badge: 'Horario vigente', puedeMarcar: true, vigente: true};
     }
     // Si ya pasó el rango de entrada y no marcó
-    if (!yaEntrada && ahora > finAtraso) {
-      return {accion: '', badge: 'No marcaste entrada', puedeMarcar: false, vigente: true};
+    if (!yaEntrada && ahora > horaFin) {
+      // Después de la hora de fin, el turno ya no es vigente y no muestra badge
+      return {accion: '', badge: '', puedeMarcar: false, vigente: false};
     }
     // Salida: solo si ya marcó entrada y no salida, y es después de la hora de salida
     if (yaEntrada && !yaSalida && ahora >= horaFin) {
-      // Si hay siguiente horario, el vigente desaparece 15 minutos antes del próximo
-      if (siguienteHorario) {
-        const siguienteHoraInicioStr = siguienteHorario.horaInicio.length > 5 ? siguienteHorario.horaInicio.slice(0,5) : siguienteHorario.horaInicio;
-        const siguienteHoraInicio = crearFechaEcuador(hoyFecha, siguienteHoraInicioStr);
-        const limiteFin = new Date(siguienteHoraInicio.getTime() - 15 * 60000);
-        if (ahora >= limiteFin) {
-          return {accion: '', badge: 'Límite de salida alcanzado', puedeMarcar: false, vigente: false};
-        } else {
-          // Permitir salida y mantener vigente hasta 15 minutos antes del siguiente horario
-          return {accion: 'salida', badge: 'Pendiente de salida', puedeMarcar: true, vigente: true};
-        }
-      }
-      // Si es horario nocturno, solo se puede marcar hasta las 23:59
-      const limiteMaximoSalida = new Date(`${hoyFecha}T23:59:00-05:00`);
-      if (!siguienteHorario && ahora > limiteMaximoSalida) {
-        return {accion: '', badge: 'Límite del día alcanzado', puedeMarcar: false, vigente: false};
-      }
       return {accion: 'salida', badge: 'Pendiente de salida', puedeMarcar: true, vigente: true};
     }
     // Si ya marcó entrada y no salida, pero aún no es hora de salida, mantener el horario vigente pero sin permitir marcar salida

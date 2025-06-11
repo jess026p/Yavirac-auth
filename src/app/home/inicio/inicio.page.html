@@ -82,8 +82,11 @@
     </ion-card-content>
   </ion-card>
 
-  <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()" [disabled]="!puedeMarcarAsistencia">
-    {{ puedeMarcarAsistencia ? 'Verificar Asistencia' : (badgeHorario === 'No marcaste entrada' ? 'No marcaste entrada' : 'Asistencia completada') }}
+  <ion-button expand="full" (click)="verificarTipoMarcacionYAsistir()" [disabled]="!puedeMarcarAsistencia || !locationAuthEnabled">
+    {{
+      !locationAuthEnabled ? 'Debes activar la ubicación en ajustes' :
+      (puedeMarcarAsistencia ? 'Verificar Asistencia' : (badgeHorario === 'No marcaste entrada' ? 'No marcaste entrada' : 'Asistencia completada'))
+    }}
   </ion-button>
 
 </ion-content>
