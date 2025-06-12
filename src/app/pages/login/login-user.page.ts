@@ -79,6 +79,13 @@ export class LoginUserPage implements OnInit {
     this.biometricAuthEnabled = bioAuth.value === null ? true : bioAuth.value === 'true';
   }
 
+  async ionViewWillEnter() {
+    const creds = await Preferences.get({ key: 'biometricUser' });
+    this.biometricAvailable = !!creds.value;
+    const bioAuth = await Preferences.get({ key: 'biometricAuth' });
+    this.biometricAuthEnabled = bioAuth.value === null ? true : bioAuth.value === 'true';
+  }
+
   async showToast(message: string, color: string = 'success') {
     const toast = await this.toastCtrl.create({
       message,
